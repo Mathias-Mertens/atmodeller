@@ -43,23 +43,24 @@ dependencies = [
     # JAX pinned for Intel macOS
     "jax==0.4.38; sys_platform == 'darwin' and platform_machine == 'x86_64'",
     # JAX pinned for all other platforms
-    "jax==0.7.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "jax>0.4.38,!=0.7.0,!=0.7.1; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     # SciPy and NumPy minimum requirements for jax 0.4.31
     "scipy>=1.10.0",
     "numpy>=1.24.0",
-    "pandas>=2.2.3",
+    "pandas>=2.3.0",
     "openpyxl>=3.1.2",
-    "molmass>=2025.4.14",
+    "molmass>=2025.9.4",
     "ipykernel>=6.29.5",
-    "matplotlib>=3.9.1",
+    "matplotlib>=3.9.0",
     "jupyter>=1.0.0",
-    "seaborn>=0.13.2",
     "typing-extensions>=4.12.2; python_version < '3.12'",
-    "optax>=0.2.5",
-    "xmmutablemap>=0.1",
-    "optimistix>=0.0.10",
-    "equinox>=0.13.0",
-    "jaxmod>=0.2.2",
+    # Optax pinned for Intel macOS
+    "optax==0.2.5; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "optax>0.2.5; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "xmmutablemap>=0.2.1",
+    "optimistix>=0.0.11",
+    "equinox>=0.13.2",
+    "jaxmod>=0.2.3",
 ]
 
 [project.urls]
