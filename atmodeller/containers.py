@@ -167,6 +167,8 @@ class SpeciesCollection(eqx.Module):
     """Molar masses"""
     unique_elements: tuple[str, ...]
     """Unique elements in species in alphabetical order"""
+    element_molar_masses: NpFloat
+    """Molar masses of the ordered elements"""
     diatomic_oxygen_index: int
     """Index of diatomic oxygen"""
     number_reactions: int
@@ -205,6 +207,14 @@ class SpeciesCollection(eqx.Module):
             elements.extend(species_.data.elements)
         unique_elements: list[str] = list(set(elements))
         self.unique_elements = tuple(sorted(unique_elements))
+
+        # Element molar masses
+        element_molar_masses: list[float] = []
+        for element_ in self.unique_elements:
+            mformula: Formula = Formula(element_)
+            molar_mass: float = mformula.mass * unit_conversion.g_to_kg
+            element_molar_masses.append(molar_mass)
+        self.element_molar_masses = np.array(element_molar_masses)
 
         self.diatomic_oxygen_index = self.get_diatomic_oxygen_index()
 
@@ -675,25 +685,32 @@ class MassConstraints(eqx.Module):
     """Mass constraints of elements
 
     Args:
-        log_abundance: Log number of atoms
-        elements: Elements corresponding to the columns of ``log_abundance``
+        abundance: Abundance
+        species: Species
+        units: Units of the abundance. Defaults to ``mass``.
     """
 
-    log_abundance: Float64[Array, "dim elements"] = eqx.field(converter=as_j64)
-    elements: tuple[str, ...]
+    abundance: Float[Array, "..."] = eqx.field(converter=as_j64)
+    """Abundance"""
+    species: SpeciesCollection
+    """Species"""
+    units: Literal["mass", "moles"] = "mass"
+    """Units of the abundance"""
 
     @classmethod
     def create(
         cls,
         species: SpeciesCollection,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
+        units: Literal["mass", "moles"] = "mass",
     ) -> "MassConstraints":
         """Creates an instance
 
         Args:
             species: Species
-            mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
+            mass_constraints: Mapping of element name and mass constraint in ``units``. Defaults to
                 ``None``.
+            units: Units of the abundance. Defaults to ``mass``.
 
         Returns:
             An instance
@@ -702,27 +719,65 @@ class MassConstraints(eqx.Module):
             mass_constraints if mass_constraints is not None else {}
         )
 
-        # All unique elements in alphabetical order
-        unique_elements: tuple[str, ...] = species.unique_elements
-
         # Determine the maximum length of any array in mass_constraints_
         max_len: int = get_batch_size(mass_constraints_)
 
         # Initialise to all nans assuming that there are no mass constraints
-        log_abundance: NpFloat = np.full((max_len, len(unique_elements)), np.nan, dtype=np.float64)
+        abundance: NpFloat = np.full(
+            (max_len, len(species.unique_elements)), np.nan, dtype=np.float64
+        )
 
         # Populate mass constraints
-        for nn, element in enumerate(unique_elements):
+        for nn, element in enumerate(species.unique_elements):
             if element in mass_constraints_.keys():
-                molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
-                log_abundance_: ArrayLike = (
-                    np.log(mass_constraints_[element]) + np.log(AVOGADRO) - np.log(molar_mass)
-                )
-                log_abundance[:, nn] = log_abundance_  # broadcasts scalar along that column
+                # Broadcasts scalar along that column
+                abundance[:, nn] = mass_constraints_[element]
 
         # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
-        return cls(log_abundance, unique_elements)
+        return cls(abundance, species, units)
+
+    def abundance_mol(self) -> Float[Array, "..."]:
+        """Abundance by moles for all elements
+
+        Returns:
+            Abundance by moles for all elements
+        """
+        if self.units == "mass":
+            return self.abundance / self.species.element_molar_masses
+        elif self.units == "moles":
+            return self.abundance
+        else:
+            raise ValueError("Units must be 'mass' or 'moles'")
+
+    def abundance_mass(self) -> Float[Array, "..."]:
+        """Abundance by mass for all elements
+
+        Returns:
+            Abundance by mass for all elements
+        """
+        if self.units == "mass":
+            return self.abundance
+        elif self.units == "moles":
+            return self.abundance * self.species.element_molar_masses
+        else:
+            raise ValueError("Units must be 'mass' or 'moles'")
+
+    def abundance_molecules(self) -> Float[Array, "..."]:
+        """Abundance by molecules for all elements
+
+        Returns:
+            Abundance by molecules for all elements
+        """
+        return self.abundance_mol() * AVOGADRO
+
+    def log_abundance(self) -> Float[Array, "..."]:
+        """Log abundance by molecules for all elements
+
+        Returns:
+            Log abundance by molecules for all elements
+        """
+        return jnp.log(self.abundance_molecules())
 
     def asdict(self) -> dict[str, NpArray]:
         """Gets a dictionary of the values as NumPy arrays
@@ -730,10 +785,10 @@ class MassConstraints(eqx.Module):
         Returns:
             A dictionary of the values
         """
-        abundance: NpArray = np.exp(self.log_abundance)
+        abundance: NpArray = np.asarray(self.abundance_molecules())
         out: dict[str, NpArray] = {
             f"{element}_number": abundance[:, idx]
-            for idx, element in enumerate(self.elements)
+            for idx, element in enumerate(self.species.unique_elements)
             if not np.all(np.isnan(abundance[:, idx]))
         }
 
@@ -750,7 +805,7 @@ class MassConstraints(eqx.Module):
         Returns:
             Mask indicating whether elemental mass constraints are active or not
         """
-        return ~jnp.isnan(jnp.atleast_1d(self.log_abundance.squeeze()))
+        return ~jnp.isnan(jnp.atleast_1d(self.log_abundance().squeeze()))
 
     def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Float64[Array, "..."]:
         """Log number density
@@ -767,7 +822,7 @@ class MassConstraints(eqx.Module):
             Log number density
         """
         log_number_density: Float64[Array, "..."] = (
-            self.log_abundance.squeeze() - log_atmosphere_volume
+            self.log_abundance().squeeze() - log_atmosphere_volume
         )
 
         return log_number_density

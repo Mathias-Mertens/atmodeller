@@ -365,7 +365,7 @@ def get_min_log_elemental_abundance_per_species(
 
     # log_abundance is a 1-D array, which cannot be transposed, so make a 2-D array
     log_abundance: Float[Array, "elements 1"] = jnp.atleast_2d(
-        parameters.mass_constraints.log_abundance
+        parameters.mass_constraints.log_abundance()
     ).T
     # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
