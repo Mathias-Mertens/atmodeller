@@ -28,10 +28,13 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optimistix as optx
-from jax import lax, random
+from equinox._enum import EnumerationItem
+from jax import lax
+from jaxmod.solvers import MultiTrySolution, batch_retry_solver
 from jaxmod.utils import vmap_axes_spec
 from jaxtyping import Array, Bool, Float, Integer, PRNGKeyArray
 
+from atmodeller.constants import TAU, TAU_MAX, TAU_NUM
 from atmodeller.containers import Parameters
 from atmodeller.engine import objective_function
 
@@ -62,14 +65,6 @@ def solver_single(
         max_steps=parameters.solver_parameters.max_steps,
         options=parameters.solver_parameters.get_options(parameters.species.number_species),
     )
-
-    # TODO: Remove
-    # solution: Float[Array, "..."] = sol.value
-    # status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
-    # steps: Integer[Array, ""] = sol.stats["num_steps"]
-    # jax.debug.print("solution = {out}", out=solution)
-    # jax.debug.print("status = {out}", out=status)
-    # jax.debug.print("steps = {out}", out=steps)
 
     return sol
 
@@ -131,178 +126,33 @@ def get_solver_batch(parameters: Parameters) -> Callable:
     return solver
 
 
-@eqx.filter_jit
-# @eqx.debug.assert_max_traces(max_traces=1)
-def repeat_solver(
+# @eqx.filter_jit
+@eqx.debug.assert_max_traces(max_traces=2)
+def solver_tau_step(
     solver_fn: Callable,
     initial_guess: Float[Array, "batch solution"],
     parameters: Parameters,
     key: PRNGKeyArray,
-) -> tuple[
-    Float[Array, "batch solution"],
-    Bool[Array, " batch"],
-    Integer[Array, " batch"],
-    Integer[Array, " batch"],
-]:
-    """Repeatable multistart solver with perturbations for failed entries.
+) -> MultiTrySolution:
+    """Solves a batch of solutions for a sequence of tau values using a solver function.
 
-    This function attempts to solve a system of equations for a batch of initial solutions. If
-    some entries fail to converge, it perturbs only the failing solutions and retries, up to a
-    maximum number of attempts specified in
-    :attr:`~atmodeller.containers.SolverParameters.multistart`.
-
-    The perturbation is applied proportionally to
-    :attr:`~atmodeller.containers.SolverParameters.multistart_perturbation`. Successful solutions
-    are kept as-is, and the function tracks the iteration when each entry first succeeded.
+    This function iterates over a set of tau values and applies the solver function (``solver_fn``)
+    to the batch of solutions at each tau step. It dynamically updates the ``tau`` value in the
+    solver parameters for each iteration. This function is intended to be used inside
+    ``jax.lax.scan`` to efficiently sweep over multiple tau values in a single compiled loop.
 
     Args:
-        solver_fn: Solver function
-        initial_guess: Initial guess for the solution
-        parameters: Model parameters required by the objective function and solver
-        key: A JAX random key for generating perturbations
-
-    Returns:
-        tuple:
-            - final_solution: Array of solution values
-            - final_status: Boolean scalar indicating whether the solver converged
-            - final_steps: Integer scalar giving the number of iterations performed
-            - final_attempts: Success attempts
-    """
-
-    def body_fn(state: tuple[Array, ...]) -> tuple[Array, ...]:
-        """Performs one iteration of the solver retry loop.
-
-        Args:
-            state: Tuple containing:
-                i: Current attempt index
-                key: PRNG key for random number generation
-                solution: Current solution array
-                status: Boolean array indicating successful solutions
-                steps: Step count
-                success_attempt: Integer array recording iteration of success for each entry
-
-        Returns:
-            Updated state tuple
-        """
-        i, key, solution, status, steps, success_attempt = state
-        # jax.debug.print("Iteration: {out}", out=i)
-
-        failed_mask: Bool[Array, " batch"] = ~status
-        key, subkey = random.split(key)
-
-        # Perturb the (initial) solution for cases that failed. Something more sophisticated could
-        # be implemented, such as a regressor or neural network to inform failed cases based on
-        # successful solves.
-        perturb_shape: tuple[int, int] = (solution.shape[0], solution.shape[1])
-        raw_perturb: Float[Array, "batch solution"] = random.uniform(
-            subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
-        )
-        perturbations: Float[Array, "batch solution"] = jnp.where(
-            failed_mask[:, None],
-            parameters.solver_parameters.multistart_perturbation * raw_perturb,
-            jnp.zeros_like(solution),
-        )
-        new_initial_solution: Float[Array, "batch solution"] = solution + perturbations
-        # jax.debug.print("new_initial_solution = {out}", out=new_initial_solution)
-
-        new_sol: optx.Solution = solver_fn(new_initial_solution, parameters)
-
-        new_solution: Float[Array, "batch solution"] = new_sol.value
-        new_status: Bool[Array, " batch"] = new_sol.result == optx.RESULTS.successful
-        new_steps: Integer[Array, " batch"] = new_sol.stats["num_steps"]
-
-        # Determine which entries to update: previously failed, now succeeded
-        update_mask: Bool[Array, " batch"] = failed_mask & new_status
-        updated_i: Integer[Array, "..."] = i + 1
-        updated_solution: Float[Array, "batch solution"] = cast(
-            Array, jnp.where(update_mask[:, None], new_solution, solution)
-        )
-        updated_status: Bool[Array, " batch"] = status | new_status
-        updated_steps: Integer[Array, " batch"] = cast(
-            Array, jnp.where(update_mask, new_steps, steps)
-        )
-        updated_success_attempt: Array = jnp.where(update_mask, updated_i, success_attempt)
-
-        return (
-            updated_i,
-            key,
-            updated_solution,
-            updated_status,
-            updated_steps,
-            updated_success_attempt,
-        )
-
-    def cond_fn(state: tuple[Array, ...]) -> Bool[Array, "..."]:
-        """Checks if the solver should continue retrying.
-
-        Args:
-            state: Tuple containing:
-                i: Current attempt index
-                _: Unused (PRNG key)
-                _: Unused (solution)
-                status: Boolean array indicating success of each solution
-                _: Unused (steps)
-                _: Unused (success_attempt)
-
-        Returns:
-            A boolean array indicating whether retries should continue (True if any solution
-            failed and attempts are still available)
-        """
-        i, _, _, status, _, _ = state
-
-        # For debugging to force the loop to run to the maximum allowable value
-        # return jnp.logical_and(i < parameters.solver_parameters.multistart, True)
-
-        return jnp.logical_and(i < parameters.solver_parameters.multistart, jnp.any(~status))
-
-    # Try first solution
-    first_sol: optx.Solution = solver_fn(initial_guess, parameters)
-    first_solution: Float[Array, "batch solution"] = first_sol.value
-    first_solver_status: Bool[Array, " batch"] = first_sol.result == optx.RESULTS.successful
-    first_solver_steps: Integer[Array, " batch"] = first_sol.stats["num_steps"]
-    # jax.debug.print("first_solution = {out}", out=first_solution)
-    # jax.debug.print("first_solver_status = {out}", out=first_solver_status)
-    # jax.debug.print("first_solver_steps = {out}", out=first_solver_steps)
-
-    # Failback solution
-    solution = cast(Array, jnp.where(first_solver_status[:, None], first_solution, initial_guess))
-    # jax.debug.print("solution = {out}", out=solution)
-
-    initial_state: tuple[Array, ...] = (
-        jnp.array(1),  # First attempt of the repeat_solver
-        key,
-        solution,
-        first_solver_status,
-        first_solver_steps,
-        first_solver_status.astype(int),  # 1 for solved, otherwise 0
-    )
-
-    _, _, final_solution, final_status, final_steps, final_success_attempt = lax.while_loop(
-        cond_fn, body_fn, initial_state
-    )
-
-    return final_solution, final_status, final_steps, final_success_attempt
-
-
-def make_solve_tau_step(solver_fn: Callable, parameters: Parameters) -> Callable:
-    """Factory function that creates a JIT-compiled solver step for a sequence of tau values.
-
-    This wraps a repeatable, vmapped solver function (``solver_fn``) to update the ``tau``
-    parameter dynamically at each step. The returned function is suitable for use in
-    :func:`jax.lax.scan` to efficiently sweep over multiple tau values in a single compiled loop.
-
-    Args:
-        solver_fn: Solver function
+        solver_fn: Callable that performs a single solve and returns an ``optx.Solution`` object
+        initial_guess: Batched array of initial guesses for the solver
         parameters: Template :class:`~atmodeller.containers.Parameters` object containing the
             full solver configuration. The ``tau`` leaf inside
             :class:`~atmodeller.containers.SolverParameters` will be replaced at each step.
+        key: JAX PRNG key for reproducible random perturbations
 
     Returns:
         Callable
     """
 
-    @eqx.filter_jit
-    # @eqx.debug.assert_max_traces(max_traces=1)
     def solve_tau_step(carry: tuple, tau: Float[Array, " batch"]) -> tuple[tuple, tuple]:
         """Performs a single solver step for a given batch of tau values.
 
@@ -325,15 +175,106 @@ def make_solve_tau_step(solver_fn: Callable, parameters: Parameters) -> Callable
         new_parameters: Parameters = eqx.tree_at(get_leaf, parameters, tau)
         # jax.debug.print("tau = {out}", out=new_parameters.solver_parameters.tau)
 
-        new_solution, new_status, new_steps, success_attempt = repeat_solver(
-            solver_fn, solution, new_parameters, subkey
+        new_sol: MultiTrySolution = batch_retry_solver(
+            solver_fn,
+            solution,
+            new_parameters,
+            parameters.solver_parameters.multistart_perturbation,
+            parameters.solver_parameters.multistart,
+            subkey,
         )
+
+        new_solution: Float[Array, "batch solution"] = new_sol.value
+        new_result: optx.RESULTS = new_sol.result
+        new_steps: Integer[Array, " batch"] = new_sol.stats["num_steps"]
+        success_attempt: Integer[Array, " batch"] = new_sol.attempts
 
         new_carry: tuple[PRNGKeyArray, Float[Array, "batch solution"]] = (key, new_solution)
 
         # Output current solution for this tau step
-        out: tuple[Array, ...] = (new_solution, new_status, new_steps, success_attempt)
+        out: tuple[Array, ...] = (new_solution, new_result._value, new_steps, success_attempt)  # pyright: ignore
 
         return new_carry, out
 
-    return solve_tau_step
+    varying_tau_row: Float[Array, " tau"] = jnp.logspace(
+        jnp.log10(TAU_MAX), jnp.log10(TAU), num=TAU_NUM
+    )
+    constant_tau_row: Float[Array, " tau"] = jnp.full((TAU_NUM,), TAU)
+    tau_templates: Float[Array, "tau 2"] = jnp.stack([varying_tau_row, constant_tau_row], axis=1)
+
+    # Create solver_status as a 1-D array of zeros with the same number of rows as initial_guess
+    solver_status: jnp.ndarray = jnp.zeros(initial_guess.shape[0], dtype=int)
+
+    tau_array: Float[Array, "tau batch"] = tau_templates[:, solver_status]
+
+    initial_carry: tuple[Array, Array] = (key, initial_guess)
+
+    _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
+    solution, result_value, steps, attempts = results
+
+    # Aggregate output
+    # Solution and result for final TAU
+    solution = solution[-1]
+    result = cast(optx.RESULTS, EnumerationItem(result_value[-1], optx.RESULTS))  # pyright: ignore
+    steps = jnp.sum(steps, axis=0)  # Sum steps for all tau
+    attempts = jnp.max(attempts, axis=0)  # Max for all tau
+
+    # Bundle the final solution into a single object
+    sol_multi: MultiTrySolution = MultiTrySolution(
+        solution, result, None, {"num_steps": steps}, None, attempts
+    )
+
+    return sol_multi
+
+
+def make_solver(parameters: Parameters) -> Callable:
+    """Solver function with JIT compilation. Handles multistart stability and generic solvers.
+
+    Args:
+        parameters: Parameters
+
+    Returns:
+        Solver
+    """
+    solver: Callable = get_solver_individual(parameters)
+
+    # @eqx.filter_jit
+    @eqx.debug.assert_max_traces(max_traces=1)
+    def solve_with_jit(
+        key: PRNGKeyArray,
+        base_solution_array: Float[Array, "batch solution"],
+        parameters: Parameters,
+    ):
+        """Wrapped version of the solve function with JIT compilation for branching logic."""
+
+        # Define the condition to check if active stability is enabled
+        condition: Bool[Array, ""] = jnp.any(parameters.species.active_stability)
+
+        def multistart_stability(key):
+            """Function for multistart with stability"""
+            subkey = jax.random.split(key)[1]  # Split only once and pass subkey
+            return solver_tau_step(solver, base_solution_array, parameters, subkey)
+
+        def multistart_generic(key):
+            """Function for generic multistart"""
+            subkey = jax.random.split(key)[1]  # Split only once and pass subkey
+            return batch_retry_solver(
+                solver,
+                base_solution_array,
+                parameters,
+                parameters.solver_parameters.multistart_perturbation,
+                parameters.solver_parameters.multistart,
+                subkey,
+            )
+
+        # Use jax.lax.cond to select the branch based on the condition
+        multi_sol = lax.cond(
+            condition,
+            lambda _: multistart_stability(key),  # True: Use stability solver
+            lambda _: multistart_generic(key),  # False: Use generic solver
+            operand=None,  # Operand not used for decision making
+        )
+
+        return multi_sol
+
+    return solve_with_jit
