@@ -25,6 +25,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as random
 import numpy as np
+import optimistix as optx
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 
 from atmodeller.constants import (
@@ -145,7 +146,10 @@ class InteriorAtmosphere:
 
         # First solution attempt. A good initial guess might find solutions for all cases.
         logger.info(f"Attempting to solve {parameters.batch_size} model(s)")
-        solution, solver_status, solver_steps = self._solver(base_solution_array, parameters)
+        sol: optx.Solution = self._solver(base_solution_array, parameters)
+        solution: Float[Array, "batch solution"] = sol.value
+        solver_status: Bool[Array, " batch"] = sol.result == optx.RESULTS.successful
+        solver_steps: Integer[Array, " batch"] = sol.stats["num_steps"]
         # jax.debug.print("solution = {out}", out=solution)
         # jax.debug.print("solver_status = {out}", out=solver_status)
         # jax.debug.print("solver_steps = {out}", out=solver_steps)

@@ -42,7 +42,7 @@ LOG_NUMBER_DENSITY_VMAP_AXES: int = 0
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solver_single(
     initial_guess: Float[Array, "..."], parameters: Parameters, objective_function: Callable
-) -> tuple[Float[Array, "..."], Bool[Array, ""], Integer[Array, ""]]:
+) -> optx.Solution:
     """Solves a single system of non-linear equations.
 
     Args:
@@ -51,10 +51,7 @@ def solver_single(
         objective_function: Callable returning residuals for the system
 
     Returns:
-        tuple:
-            - solution: Array of solution values
-            - status: Boolean scalar indicating whether the solver converged
-            - steps: Integer scalar giving the number of iterations performed
+        Optimistix solution object
     """
     sol: optx.Solution = optx.root_find(
         objective_function,
@@ -66,15 +63,15 @@ def solver_single(
         options=parameters.solver_parameters.get_options(parameters.species.number_species),
     )
 
-    solution: Float[Array, "..."] = sol.value
-    status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
-    steps: Integer[Array, ""] = sol.stats["num_steps"]
-
+    # TODO: Remove
+    # solution: Float[Array, "..."] = sol.value
+    # status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
+    # steps: Integer[Array, ""] = sol.stats["num_steps"]
     # jax.debug.print("solution = {out}", out=solution)
     # jax.debug.print("status = {out}", out=status)
     # jax.debug.print("steps = {out}", out=steps)
 
-    return solution, status, steps
+    return sol
 
 
 def get_solver_individual(parameters: Parameters) -> Callable:
@@ -119,17 +116,17 @@ def get_solver_batch(parameters: Parameters) -> Callable:
     solver_fn: Callable = eqx.Partial(solver_single, objective_function=objective_vmap)
 
     @eqx.filter_jit
-    def solver(
-        solution: Array, parameters: Parameters
-    ) -> tuple[Float[Array, " batch solution"], Bool[Array, " batch"], Integer[Array, " batch"]]:
-        sol_value, solver_status, solver_steps = solver_fn(solution, parameters)
+    def solver(solution: Array, parameters: Parameters) -> optx.Solution:
+        sol: optx.Solution = solver_fn(solution, parameters)
 
+        # FIXME: If want the arrays to be consistent with batch dimension then these need
+        # broadcast and updating the sol object via tree surgery (tree_at)
         # Broadcast scalars to match batch dimension
-        batch_size: int = solution.shape[0]
-        solver_status_b: Bool[Array, " batch"] = jnp.broadcast_to(solver_status, (batch_size,))
-        solver_steps_b: Integer[Array, " batch"] = jnp.broadcast_to(solver_steps, (batch_size,))
-
-        return sol_value, solver_status_b, solver_steps_b
+        # batch_size: int = solution.shape[0]
+        # solver_status_b: Bool[Array, " batch"] = jnp.broadcast_to(solver_status, (batch_size,))
+        # solver_steps_b: Integer[Array, " batch"] = jnp.broadcast_to(solver_steps, (batch_size,))
+        # return sol_value, solver_status_b, solver_steps_b
+        return sol
 
     return solver
 
@@ -208,7 +205,11 @@ def repeat_solver(
         new_initial_solution: Float[Array, "batch solution"] = solution + perturbations
         # jax.debug.print("new_initial_solution = {out}", out=new_initial_solution)
 
-        new_solution, new_status, new_steps = solver_fn(new_initial_solution, parameters)
+        new_sol: optx.Solution = solver_fn(new_initial_solution, parameters)
+
+        new_solution: Float[Array, "batch solution"] = new_sol.value
+        new_status: Bool[Array, " batch"] = new_sol.result == optx.RESULTS.successful
+        new_steps: Integer[Array, " batch"] = new_sol.stats["num_steps"]
 
         # Determine which entries to update: previously failed, now succeeded
         update_mask: Bool[Array, " batch"] = failed_mask & new_status
@@ -255,7 +256,10 @@ def repeat_solver(
         return jnp.logical_and(i < parameters.solver_parameters.multistart, jnp.any(~status))
 
     # Try first solution
-    first_solution, first_solver_status, first_solver_steps = solver_fn(initial_guess, parameters)
+    first_sol: optx.Solution = solver_fn(initial_guess, parameters)
+    first_solution: Float[Array, "batch solution"] = first_sol.value
+    first_solver_status: Bool[Array, " batch"] = first_sol.result == optx.RESULTS.successful
+    first_solver_steps: Integer[Array, " batch"] = first_sol.stats["num_steps"]
     # jax.debug.print("first_solution = {out}", out=first_solution)
     # jax.debug.print("first_solver_status = {out}", out=first_solver_status)
     # jax.debug.print("first_solver_steps = {out}", out=first_solver_steps)
