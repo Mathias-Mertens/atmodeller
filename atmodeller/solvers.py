@@ -127,7 +127,7 @@ def get_solver_batch(parameters: Parameters) -> Callable:
 
 
 # @eqx.filter_jit
-@eqx.debug.assert_max_traces(max_traces=2)
+# @eqx.debug.assert_max_traces(max_traces=1)
 def solver_tau_step(
     solver_fn: Callable,
     initial_guess: Float[Array, "batch solution"],
@@ -212,11 +212,10 @@ def solver_tau_step(
     _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
     solution, result_value, steps, attempts = results
 
-    # Aggregate output
-    # Solution and result for final TAU
+    # Aggregate output, solution and result for final TAU
     solution = solution[-1]
     result = cast(optx.RESULTS, EnumerationItem(result_value[-1], optx.RESULTS))  # pyright: ignore
-    steps = jnp.sum(steps, axis=0)  # Sum steps for all tau
+    steps = jnp.max(steps, axis=0)  # Max steps for all tau
     attempts = jnp.max(attempts, axis=0)  # Max for all tau
 
     # Bundle the final solution into a single object
@@ -238,15 +237,23 @@ def make_solver(parameters: Parameters) -> Callable:
     """
     solver: Callable = get_solver_individual(parameters)
 
-    # @eqx.filter_jit
-    @eqx.debug.assert_max_traces(max_traces=1)
+    @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
     def solve_with_jit(
         key: PRNGKeyArray,
         base_solution_array: Float[Array, "batch solution"],
         parameters: Parameters,
-    ):
-        """Wrapped version of the solve function with JIT compilation for branching logic."""
+    ) -> MultiTrySolution:
+        """Wrapped version of the solve function with JIT compilation for branching logic.
 
+        Args:
+            key: Random key
+            base_solution_array: Base solution array
+            parameters: Parameters
+
+        Returns:
+            MultiTrySolution object
+        """
         # Define the condition to check if active stability is enabled
         condition: Bool[Array, ""] = jnp.any(parameters.species.active_stability)
 
@@ -267,7 +274,6 @@ def make_solver(parameters: Parameters) -> Callable:
                 subkey,
             )
 
-        # Use jax.lax.cond to select the branch based on the condition
         multi_sol = lax.cond(
             condition,
             lambda _: multistart_stability(key),  # True: Use stability solver
