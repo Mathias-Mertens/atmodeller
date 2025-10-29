@@ -44,18 +44,25 @@ LOG_NUMBER_DENSITY_VMAP_AXES: int = 0
 # @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solver_single(
-    initial_guess: Float[Array, "..."], parameters: Parameters, objective_function: Callable
-) -> optx.Solution:
+    initial_guess: Float[Array, "..."],
+    parameters: Parameters,
+    key: PRNGKeyArray,
+    objective_function: Callable,
+) -> MultiTrySolution:
     """Solves a single system of non-linear equations.
+
+    ``key`` is not used but is required for consistency with the interface.
 
     Args:
         initial_guess: Initial guess for the solution
         parameters: Model parameters required by the objective function and solver
+        key: JAX PRNG key for reproducible random perturbations (unused)
         objective_function: Callable returning residuals for the system
 
     Returns:
-        Optimistix solution object
+        :class:`~jaxmod.solvers.MultiTrySolution` object
     """
+    del key
     sol: optx.Solution = optx.root_find(
         objective_function,
         parameters.solver_parameters.get_solver_instance(),
@@ -66,7 +73,17 @@ def solver_single(
         options=parameters.solver_parameters.get_options(parameters.species.number_species),
     )
 
-    return sol
+    # Instantiate a new MultiTrySolution, pass arguments, and set attempts to unity
+    multi_sol: MultiTrySolution = MultiTrySolution(
+        sol.value,
+        sol.result,
+        aux=sol.aux,
+        stats=sol.stats,
+        state=sol.state,
+        attempts=jnp.ones(len(sol.value), dtype=int),
+    )
+
+    return multi_sol
 
 
 def get_solver_individual(parameters: Parameters) -> Callable:
@@ -80,13 +97,13 @@ def get_solver_individual(parameters: Parameters) -> Callable:
         parameters: Model parameters required by the objective function and solver
 
     Returns:
-        Callable
+        Callable that returns a :class:`~jaxmod.solvers.MultiTrySolution` object
     """
     solver_fn: Callable = eqx.Partial(solver_single, objective_function=objective_function)
 
     return eqx.filter_jit(
         eqx.filter_vmap(
-            solver_fn, in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters))
+            solver_fn, in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters), None)
         )
     )
 
@@ -102,7 +119,7 @@ def get_solver_batch(parameters: Parameters) -> Callable:
         parameters: Model parameters required by the objective function and solver
 
     Returns:
-        Callable
+        Callable that returns a :class:`~jaxmod.solvers.MultiTrySolution` object
     """
     objective_vmap: Callable = eqx.filter_vmap(
         objective_function,
@@ -111,22 +128,36 @@ def get_solver_batch(parameters: Parameters) -> Callable:
     solver_fn: Callable = eqx.Partial(solver_single, objective_function=objective_vmap)
 
     @eqx.filter_jit
-    def solver(solution: Array, parameters: Parameters) -> optx.Solution:
-        sol: optx.Solution = solver_fn(solution, parameters)
+    def solver(solution: Array, parameters: Parameters, key: PRNGKeyArray) -> MultiTrySolution:
+        sol: optx.Solution = solver_fn(solution, parameters, key)
 
-        # FIXME: If want the arrays to be consistent with batch dimension then these need
-        # broadcast and updating the sol object via tree surgery (tree_at)
-        # Broadcast scalars to match batch dimension
-        # batch_size: int = solution.shape[0]
-        # solver_status_b: Bool[Array, " batch"] = jnp.broadcast_to(solver_status, (batch_size,))
-        # solver_steps_b: Integer[Array, " batch"] = jnp.broadcast_to(solver_steps, (batch_size,))
-        # return sol_value, solver_status_b, solver_steps_b
-        return sol
+        # Batch model will return a single result, so we broadcast to maintain consistency with
+        # downstream processing that expects a batch dimension
+        broadcasted_result: optx.RESULTS = cast(
+            optx.RESULTS,
+            EnumerationItem(jnp.broadcast_to(sol.result._value, len(sol.value)), optx.RESULTS),  # pyright: ignore
+        )
+        num_steps: Integer[Array, " batch"] = jnp.broadcast_to(
+            sol.stats["num_steps"], len(sol.value)
+        )
+        sol = eqx.tree_at(lambda sol: sol.stats["num_steps"], sol, num_steps)
+
+        # Instantiate a new MultiTrySolution, pass arguments, and set attempts to unity
+        multi_sol: MultiTrySolution = MultiTrySolution(
+            sol.value,
+            broadcasted_result,
+            aux=sol.aux,
+            stats=sol.stats,
+            state=sol.state,
+            attempts=jnp.ones(len(sol.value), dtype=int),
+        )
+
+        return multi_sol
 
     return solver
 
 
-# @eqx.filter_jit
+@eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solver_tau_step(
     solver_fn: Callable,
@@ -214,9 +245,9 @@ def solver_tau_step(
 
     # Aggregate output, solution and result for final TAU
     solution = solution[-1]
-    result = cast(optx.RESULTS, EnumerationItem(result_value[-1], optx.RESULTS))  # pyright: ignore
-    steps = jnp.max(steps, axis=0)  # Max steps for all tau
-    attempts = jnp.max(attempts, axis=0)  # Max for all tau
+    result: optx.RESULTS = cast(optx.RESULTS, EnumerationItem(result_value[-1], optx.RESULTS))  # pyright: ignore
+    steps: Integer[Array, " batch"] = jnp.max(steps, axis=0)  # Max steps for all tau
+    attempts: Integer[Array, " batch"] = jnp.max(attempts, axis=0)  # Max for all tau
 
     # Bundle the final solution into a single object
     sol_multi: MultiTrySolution = MultiTrySolution(
@@ -240,19 +271,19 @@ def make_solver(parameters: Parameters) -> Callable:
     @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
     def solve_with_jit(
-        key: PRNGKeyArray,
         base_solution_array: Float[Array, "batch solution"],
         parameters: Parameters,
+        key: PRNGKeyArray,
     ) -> MultiTrySolution:
         """Wrapped version of the solve function with JIT compilation for branching logic.
 
         Args:
-            key: Random key
             base_solution_array: Base solution array
             parameters: Parameters
+            key: Random key
 
         Returns:
-            MultiTrySolution object
+            :class:`~jaxmod.solvers.MultiTrySolution` object
         """
         # Define the condition to check if active stability is enabled
         condition: Bool[Array, ""] = jnp.any(parameters.species.active_stability)

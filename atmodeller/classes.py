@@ -19,20 +19,19 @@
 import logging
 import pprint
 from collections.abc import Callable, Mapping
-from typing import Optional
+from typing import Literal, Optional
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
-from jaxmod.solvers import MultiTrySolution
 from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY
 from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
-from atmodeller.solvers import make_solver
+from atmodeller.solvers import MultiTrySolution, get_solver_individual, make_solver
 from atmodeller.type_aliases import NpFloat
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -89,59 +88,18 @@ class InteriorAtmosphere:
 
         self._output = OutputDisequilibrium(parameters, solution_array)
 
-    def set_solver(
-        self,
-        *,
-        planet: Optional[Planet] = None,
-        fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
-        mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
-        total_pressure_constraint: Optional[ArrayLike] = None,
-        solver_parameters: Optional[SolverParameters] = None,
-    ) -> None:
-        """Constructs and JIT-compiles the solver used by :meth:`solve`.
-
-        This method generates a fully-configured solver closure based on the provided planetary
-        state and constraints. The resulting solver is JAX-compiled (via Equinox) and stored
-        internally for efficient reuse during subsequent calls to :meth:`solve` with matching
-        argument structure. Calling :meth:`solve` repeatedly after :meth:`set_solver` avoids
-        unnecessary recompilation and results in significant performance improvements.
-
-        The compilation is specialised to the shape and structure of:
-            - the species set
-            - the batch size of the input parameters
-            - the enabled constraints
-            - numerical dtypes
-
-        Any change to these may trigger a recompilation if :meth:`set_solver` is invoked again with
-        different values.
-
-        Args:
-            planet: Planet. Defaults to ``None``.
-            fugacity_constraints: Fugacity constraints. Defaults to ``None``.
-            mass_constraints: Mass constraints. Defaults to ``None``.
-            total_pressure_constraint: Total pressure constraint. Defaults to ``None``.
-            solver_parameters: Solver parameters. Defaults to ``None``.
-        """
-        parameters: Parameters = Parameters.create(
-            self.species,
-            planet,
-            fugacity_constraints,
-            mass_constraints,
-            total_pressure_constraint,
-            solver_parameters,
-        )
-        self._solver = make_solver(parameters)
-
     def solve(
         self,
         *,
-        planet: Optional[Planet] = None,
         initial_log_number_density: Optional[ArrayLike] = None,
         initial_log_stability: Optional[ArrayLike] = None,
+        planet: Optional[Planet] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         total_pressure_constraint: Optional[ArrayLike] = None,
         solver_parameters: Optional[SolverParameters] = None,
+        solver_type: Literal["basic", "robust"] = "robust",
+        solver_recompile: bool = False,
     ) -> None:
         """Runs the nonlinear solver and initialises the output state.
 
@@ -156,13 +114,16 @@ class InteriorAtmosphere:
         fast and will reuse cached compilation artifacts.
 
         Args:
-            planet: Planet. Defaults to ``None``.
             initial_log_number_density: Initial log number density. Defaults to ``None``.
             initial_log_stability: Initial log stability. Defaults to ``None``.
+            planet: Planet. Defaults to ``None``.
             fugacity_constraints: Fugacity constraints. Defaults to ``None``.
             mass_constraints: Mass constraints. Defaults to ``None``.
             total_pressure_constraint: Total pressure constraint. Defaults to ``None``.
             solver_parameters: Solver parameters. Defaults to ``None``.
+            solver_type: Build a basic (faster) or a robust (slower) solver. Defaults to
+                ``robust``.
+            solver_recompile: Force recompilation of the solver. Defaults to ``False``.
         """
         parameters: Parameters = Parameters.create(
             self.species,
@@ -183,10 +144,17 @@ class InteriorAtmosphere:
         key: PRNGKeyArray = jax.random.PRNGKey(0)
         key, subkey = jax.random.split(key)  # Split the key for use in this function
 
-        if self._solver is None:
-            self._solver = make_solver(parameters)
+        if self._solver is None or solver_recompile:
+            if solver_type == "basic":
+                self._solver = get_solver_individual(parameters)
+                # Alternatively, could use the batch solver
+                # self._solver = get_solver_batch(parameters)
+            elif solver_type == "robust":
+                self._solver = make_solver(parameters)
+            self._solver_type = solver_type  # Track current solver type
 
-        multi_sol: MultiTrySolution = self._solver(subkey, base_solution_array, parameters)
+        assert self._solver is not None
+        multi_sol: MultiTrySolution = self._solver(base_solution_array, parameters, subkey)
 
         solution = multi_sol.value
         solver_status = multi_sol.result == optx.RESULTS.successful
@@ -212,7 +180,7 @@ class InteriorAtmosphere:
         unique_vals, counts = jnp.unique(solver_attempts, return_counts=True)
         for val, count in zip(unique_vals.tolist(), counts.tolist()):
             logger.info(
-                "Multistart summary: %d (%0.2f%%) models(s) required %d attempts",
+                "Multistart summary: %d (%0.2f%%) models(s) required %d attempt(s)",
                 count,
                 count * 100 / parameters.batch_size,
                 val,

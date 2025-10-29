@@ -72,15 +72,12 @@ def test_H2O(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     interior_atmosphere.solve(
-        planet=planet,
-        mass_constraints=mass_constraints,
+        planet=planet, mass_constraints=mass_constraints, solver_type="basic"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
-    target: dict[str, float] = {
-        "H2O_g": 1.0312913336898137,
-    }
+    target: dict[str, float] = {"H2O_g": 1.0312913336898137}
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
@@ -98,8 +95,7 @@ def test_H_O(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 
     interior_atmosphere.solve(
-        planet=planet,
-        mass_constraints=mass_constraints,
+        planet=planet, mass_constraints=mass_constraints, solver_type="basic"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -128,6 +124,7 @@ def test_H_fO2(helper) -> None:
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
+        solver_type="basic",
     )
     output: Output = gas_HO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -153,6 +150,8 @@ def test_H_fO2_fH2(helper) -> None:
     gas_HO_system.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
+        solver_type="basic",
+        solver_recompile=True,
     )
     output: Output = gas_HO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -184,6 +183,8 @@ def test_H_fO2_batch_temperature(helper) -> None:
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
+        solver_type="basic",
+        solver_recompile=True,
     )
     output: Output = gas_HO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -236,6 +237,8 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
+        solver_type="basic",
+        solver_recompile=True,
     )
     output: Output = gas_HO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -286,6 +289,8 @@ def test_H_fO2_batch_H_mass(helper) -> None:
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
+        solver_type="basic",
+        solver_recompile=True,
     )
     output: Output = gas_HO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
