@@ -31,7 +31,7 @@ from atmodeller.constants import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILI
 from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
-from atmodeller.solvers import MultiTrySolution, get_solver_individual, make_solver
+from atmodeller.solvers import MultiTrySolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -146,9 +146,9 @@ class InteriorAtmosphere:
 
         if self._solver is None or solver_recompile:
             if solver_type == "basic":
-                self._solver = get_solver_individual(parameters)
+                self._solver = make_independent_solver(parameters)
                 # Alternatively, could use the batch solver
-                # self._solver = get_solver_batch(parameters)
+                # self._solver = make_batched_solver(parameters)
             elif solver_type == "robust":
                 self._solver = make_solver(parameters)
             self._solver_type = solver_type  # Track current solver type

@@ -14,11 +14,11 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Non-linear solvers for chemical equilibrium and parameterised systems.
+"""Non-linear solvers for chemical equilibrium and parameterised systems
 
 This module provides JAX-compatible solver utilities for efficiently handling both single-system
 and batched systems of non-linear equations. The solvers are designed to integrate seamlessly with
-JAX transformations support Equinox-based pytrees for flexible parameter handling.
+JAX transformations and support Equinox-based pytrees for flexible parameter handling.
 """
 
 from collections.abc import Callable
@@ -43,7 +43,7 @@ LOG_NUMBER_DENSITY_VMAP_AXES: int = 0
 
 # @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
-def solver_single(
+def solve_single_system(
     initial_guess: Float[Array, "..."],
     parameters: Parameters,
     key: PRNGKeyArray,
@@ -86,12 +86,13 @@ def solver_single(
     return multi_sol
 
 
-def get_solver_individual(parameters: Parameters) -> Callable:
+def make_independent_solver(parameters: Parameters) -> Callable:
     """Gets a vmapped, JIT-compiled solver for independent batch systems.
 
-    Wraps :func:`solver_single` with :func:`equinox.filter_vmap` and :func:`equinox.filter_jit` so
-    that it can solve multiple independent systems in a batch efficiently. Each batch element is
-    solved separately, producing per-element convergence statistics.
+    Wraps :func:`solve_single_system` with :func:`equinox.filter_vmap` and
+    :func:`equinox.filter_jit` so that it can solve multiple independent systems in a batch
+    efficiently. Each batch element is solved separately, producing per-element convergence
+    statistics.
 
     Args:
         parameters: Model parameters required by the objective function and solver
@@ -99,7 +100,7 @@ def get_solver_individual(parameters: Parameters) -> Callable:
     Returns:
         Callable that returns a :class:`~jaxmod.solvers.MultiTrySolution` object
     """
-    solver_fn: Callable = eqx.Partial(solver_single, objective_function=objective_function)
+    solver_fn: Callable = eqx.Partial(solve_single_system, objective_function=objective_function)
 
     return eqx.filter_jit(
         eqx.filter_vmap(
@@ -108,12 +109,11 @@ def get_solver_individual(parameters: Parameters) -> Callable:
     )
 
 
-def get_solver_batch(parameters: Parameters) -> Callable:
+def make_batched_solver(parameters: Parameters) -> Callable:
     """Gets a JIT-compiled solver for batched systems treated as a single problem.
 
-    In this mode, the objective function is already vmapped across the batch dimension, so
-    :func:`solver_single` sees the batch as one system. The solver returns a single convergence
-    status and iteration count, which are broadcast to match the batch shape.
+    Batch mode treats all systems as one large system, so a single convergence status applies
+    across the batch. This is broadcast back to per-batch elements for compatibility.
 
     Args:
         parameters: Model parameters required by the objective function and solver
@@ -125,7 +125,7 @@ def get_solver_batch(parameters: Parameters) -> Callable:
         objective_function,
         in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters)),
     )
-    solver_fn: Callable = eqx.Partial(solver_single, objective_function=objective_vmap)
+    solver_fn: Callable = eqx.Partial(solve_single_system, objective_function=objective_vmap)
 
     @eqx.filter_jit
     def solver(solution: Array, parameters: Parameters, key: PRNGKeyArray) -> MultiTrySolution:
@@ -159,7 +159,7 @@ def get_solver_batch(parameters: Parameters) -> Callable:
 
 @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
-def solver_tau_step(
+def tau_sweep_solver(
     solver_fn: Callable,
     initial_guess: Float[Array, "batch solution"],
     parameters: Parameters,
@@ -181,7 +181,7 @@ def solver_tau_step(
         key: JAX PRNG key for reproducible random perturbations
 
     Returns:
-        Callable
+        :class:`~jaxmod.solvers.MultiTrySolution` object
     """
 
     def solve_tau_step(carry: tuple, tau: Float[Array, " batch"]) -> tuple[tuple, tuple]:
@@ -266,7 +266,7 @@ def make_solver(parameters: Parameters) -> Callable:
     Returns:
         Solver
     """
-    solver: Callable = get_solver_individual(parameters)
+    solver: Callable = make_independent_solver(parameters)
 
     @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
@@ -288,12 +288,12 @@ def make_solver(parameters: Parameters) -> Callable:
         # Define the condition to check if active stability is enabled
         condition: Bool[Array, ""] = jnp.any(parameters.species.active_stability)
 
-        def multistart_stability(key):
+        def solve_with_stability_multistart(key):
             """Function for multistart with stability"""
             subkey = jax.random.split(key)[1]  # Split only once and pass subkey
-            return solver_tau_step(solver, base_solution_array, parameters, subkey)
+            return tau_sweep_solver(solver, base_solution_array, parameters, subkey)
 
-        def multistart_generic(key):
+        def solve_with_generic_multistart(key):
             """Function for generic multistart"""
             subkey = jax.random.split(key)[1]  # Split only once and pass subkey
             return batch_retry_solver(
@@ -307,8 +307,8 @@ def make_solver(parameters: Parameters) -> Callable:
 
         multi_sol = lax.cond(
             condition,
-            lambda _: multistart_stability(key),  # True: Use stability solver
-            lambda _: multistart_generic(key),  # False: Use generic solver
+            lambda _: solve_with_stability_multistart(key),  # True: Use stability solver
+            lambda _: solve_with_generic_multistart(key),  # False: Use generic solver
             operand=None,  # Operand not used for decision making
         )
 
