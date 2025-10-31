@@ -50,6 +50,7 @@ extensions = [
 intersphinx_mapping = {
     "jax": ("https://docs.jax.dev/en/latest/", None),
     "equinox": ("https://docs.kidger.site/equinox/", None),
+    "jaxmod": ("https://jaxmod.readthedocs.io/en/latest/", None),
 }
 
 bibtex_bibfiles = ["refs.bib"]

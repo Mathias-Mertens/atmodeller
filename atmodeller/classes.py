@@ -19,25 +19,19 @@
 import logging
 import pprint
 from collections.abc import Callable, Mapping
-from typing import Optional, cast
+from typing import Literal, Optional
 
 import jax
 import jax.numpy as jnp
-import jax.random as random
 import numpy as np
-from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
+import optimistix as optx
+from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
-from atmodeller.constants import (
-    INITIAL_LOG_NUMBER_DENSITY,
-    INITIAL_LOG_STABILITY,
-    TAU,
-    TAU_MAX,
-    TAU_NUM,
-)
+from atmodeller.constants import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY
 from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
-from atmodeller.solvers import get_solver_individual, make_solve_tau_step, repeat_solver
+from atmodeller.solvers import MultiTrySolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -74,12 +68,7 @@ class InteriorAtmosphere:
 
         return self._output
 
-    def calculate_disequilibrium(
-        self,
-        *,
-        planet: Planet,
-        log_number_density: ArrayLike,
-    ) -> None:
+    def calculate_disequilibrium(self, *, planet: Planet, log_number_density: ArrayLike) -> None:
         """Computes the Gibbs free energy disequilibrium.
 
         This method calculates the Gibbs free energy difference (ΔG) for each considered reaction
@@ -102,24 +91,39 @@ class InteriorAtmosphere:
     def solve(
         self,
         *,
-        planet: Optional[Planet] = None,
         initial_log_number_density: Optional[ArrayLike] = None,
         initial_log_stability: Optional[ArrayLike] = None,
+        planet: Optional[Planet] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         total_pressure_constraint: Optional[ArrayLike] = None,
         solver_parameters: Optional[SolverParameters] = None,
+        solver_type: Literal["basic", "robust"] = "robust",
+        solver_recompile: bool = False,
     ) -> None:
-        """Solves the system and initialises an Output instance for processing the result
+        """Runs the nonlinear solver and initialises the output state.
+
+        This method executes the compiled equilibrium solver produced by :meth:`set_solver` and
+        stores the resulting solution for downstream processing. It optionally accepts updated
+        planetary/environmental constraints and initial guesses for the nonlinear system. After
+        successful convergence, an internal ``Output`` instance is created to expose number
+        densities, activities, stabilities, and post-processed diagnostic quantities.
+
+        If :meth:`set_solver` has not been called, a suitable solver will be constructed and
+        JIT-compiled automatically. Repeated calls to :meth:`solve` with compatible shapes will be
+        fast and will reuse cached compilation artifacts.
 
         Args:
-            planet: Planet. Defaults to ``None``.
             initial_log_number_density: Initial log number density. Defaults to ``None``.
             initial_log_stability: Initial log stability. Defaults to ``None``.
+            planet: Planet. Defaults to ``None``.
             fugacity_constraints: Fugacity constraints. Defaults to ``None``.
             mass_constraints: Mass constraints. Defaults to ``None``.
             total_pressure_constraint: Total pressure constraint. Defaults to ``None``.
             solver_parameters: Solver parameters. Defaults to ``None``.
+            solver_type: Build a basic (faster) or a robust (slower) solver. Defaults to
+                ``robust``.
+            solver_recompile: Force recompilation of the solver. Defaults to ``False``.
         """
         parameters: Parameters = Parameters.create(
             self.species,
@@ -137,147 +141,50 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
-        self._solver = get_solver_individual(parameters)
-        # Alternative: solve the entire batch with a single root-finding call. This approach is
-        # less flexible because it doesn't allow inspecting the solution for each individual
-        # system.
-        # self._solver = get_solver_batch(parameters)
+        key: PRNGKeyArray = jax.random.PRNGKey(0)
+        key, subkey = jax.random.split(key)  # Split the key for use in this function
 
-        # First solution attempt. A good initial guess might find solutions for all cases.
-        logger.info(f"Attempting to solve {parameters.batch_size} model(s)")
-        solution, solver_status, solver_steps = self._solver(base_solution_array, parameters)
-        # jax.debug.print("solution = {out}", out=solution)
-        # jax.debug.print("solver_status = {out}", out=solver_status)
-        # jax.debug.print("solver_steps = {out}", out=solver_steps)
+        if self._solver is None or solver_recompile:
+            if solver_type == "basic":
+                self._solver = make_independent_solver(parameters)
+                # Alternatively, could use the batch solver
+                # self._solver = make_batched_solver(parameters)
+            elif solver_type == "robust":
+                self._solver = make_solver(parameters)
+            self._solver_type = solver_type  # Track current solver type
 
-        solver_attempts: Integer[Array, "..."] = solver_status.astype(int)
-        # jax.debug.print("solver_attempts = {out}", out=solver_attempts)
+        assert self._solver is not None
+        multi_sol: MultiTrySolution = self._solver(base_solution_array, parameters, subkey)
 
-        if jnp.any(~solver_status):
-            num_failed: int = jnp.sum(~solver_status).item()
-            logger.warning("%d model(s) failed to converge on the first attempt", num_failed)
-            logger.warning(
-                "But don't panic! This can happen when starting from a poor initial guess."
-            )
-            logger.warning(
-                "Launching multistart (maximum %d attempts)",
-                parameters.solver_parameters.multistart,
-            )
-            logger.warning(
-                "Attempting to solve the %d models(s) that initially failed", num_failed
-            )
-
-            # Restore the base solution for cases that failed since this will be perturbed
-            solution: Float[Array, "batch solution"] = cast(
-                Array, jnp.where(solver_status[:, None], solution, base_solution_array)
-            )
-            # jax.debug.print("solution = {out}", out=solution)
-
-            # Use repeat solver to ensure all cases solve
-            key: PRNGKeyArray = jax.random.PRNGKey(0)
-            key, subkey = random.split(key)
-
-            # Prototyping switching the solver for
-            # solver_parameters_ = eqx.tree_at(
-            #     lambda sp: sp.solver,
-            #     solver_parameters_,  # your original instance
-            #     optx.LevenbergMarquardt,  # or whatever solver you want to use
-            # )
-            # print(new_solver_params)
-
-            if jnp.any(parameters.species.active_stability):
-                logger.info(
-                    "Multistart with species' stability (TAU_MAX= %.1e, TAU= %.1e, TAU_NUM= %d)",
-                    TAU_MAX,
-                    TAU,
-                    TAU_NUM,
-                )
-                varying_tau_row: Float[Array, " tau"] = jnp.logspace(
-                    jnp.log10(TAU_MAX), jnp.log10(TAU), num=TAU_NUM
-                )
-                constant_tau_row: Float[Array, " tau"] = jnp.full((TAU_NUM,), TAU)
-                tau_templates: Float[Array, "tau 2"] = jnp.stack(
-                    [varying_tau_row, constant_tau_row], axis=1
-                )
-                tau_array: Float[Array, "tau batch"] = tau_templates[:, solver_status.astype(int)]
-                # jax.debug.print("tau_array = {out}", out=tau_array)
-
-                initial_carry: tuple[Array, Array] = (subkey, solution)
-                solve_tau_step: Callable = make_solve_tau_step(self._solver, parameters)
-                _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
-                solution, solver_status_, solver_steps_, solver_attempts = results
-
-                # Debugging output. Requires the complete arrays as given above.
-                failed_indices: Integer[Array, "..."] = jnp.where(~solver_status)[0]
-                for ii in failed_indices.tolist():
-                    logger.debug(f"--- Solve summary for failed index {ii} ---")
-                    for tau_i in range(TAU_NUM):
-                        status_i: bool = bool(solver_status_[tau_i, ii])
-                        steps_i: int = int(solver_steps_[tau_i, ii])
-                        attempts_i: int = int(solver_attempts[tau_i, ii])
-                        logger.debug(
-                            "Tau step %1d: status= %-5s  steps= %3d  attempts= %2d",
-                            tau_i,
-                            str(status_i),
-                            steps_i,
-                            attempts_i,
-                        )
-
-                # Aggregate output
-                solution = solution[-1]  # Only need solution for final TAU
-                solver_status_ = solver_status_[-1]  # Only need status for final TAU
-                solver_steps_ = jnp.sum(solver_steps_, axis=0)  # Sum steps for all tau
-                solver_attempts = jnp.max(solver_attempts, axis=0)  # Max for all tau
-
-                # jax.debug.print("solution = {out}", out=solution)
-                # jax.debug.print("solver_status_ = {out}", out=solver_status_)
-                # jax.debug.print("solver_steps_ = {out}", out=solver_steps_)
-                # jax.debug.print("solver_attempts = {out}", out=solver_attempts)
-
-                # Maximum attempts across all tau and all models
-                max_attempts: int = jnp.max(solver_attempts).item()
-
-            else:
-                solution, solver_status_, solver_steps_, solver_attempts = repeat_solver(
-                    self._solver, solution, parameters, subkey
-                )
-                max_attempts = jnp.max(solver_attempts).item()
-                # Since tau is unaltered, the first multistart just repeats the first calculation,
-                # which we already know has some failed cases. So we minus one for the reporting.
-                max_attempts -= 1
-
-            logger.info("Multistart complete with %s total attempt(s)", max_attempts)
-
-            # Restore statistics of cases that solved first time
-            solver_steps: Integer[Array, " batch"] = jnp.where(
-                solver_status, solver_steps, solver_steps_
-            )
-            solver_status: Bool[Array, " batch"] = solver_status_  # Final status
-
-            # Count unique values and their frequencies
-            unique_vals, counts = jnp.unique(solver_attempts, return_counts=True)
-            for val, count in zip(unique_vals.tolist(), counts.tolist()):
-                logger.info(
-                    "Multistart, max attempts: %d, model count: %d (%0.2f%%)",
-                    val,
-                    count,
-                    count * 100 / parameters.batch_size,
-                )
+        solution = multi_sol.value
+        solver_status = multi_sol.result == optx.RESULTS.successful
+        solver_steps = multi_sol.stats["num_steps"]
+        solver_attempts = multi_sol.attempts
 
         num_successful_models: int = jnp.count_nonzero(solver_status).item()
         num_failed_models: int = jnp.count_nonzero(~solver_status).item()
 
         logger.info(
-            "Solve complete: %d (%0.2f%%) successful model(s)",
+            "Solve (%s) complete: %d (%0.2f%%) successful model(s)",
+            solver_type,
             num_successful_models,
             num_successful_models * 100 / parameters.batch_size,
         )
-
         if num_failed_models > 0:
             logger.warning(
                 "%d (%0.2f%%) model(s) still failed",
                 num_failed_models,
                 num_failed_models * 100 / parameters.batch_size,
+            )
+
+        # Count unique values and their frequencies
+        unique_vals, counts = jnp.unique(solver_attempts, return_counts=True)
+        for val, count in zip(unique_vals.tolist(), counts.tolist()):
+            logger.info(
+                "Multistart summary: %d (%0.2f%%) models(s) required %d attempt(s)",
+                count,
+                count * 100 / parameters.batch_size,
+                val,
             )
 
         logger.info("Solver steps (max) = %s", jnp.max(solver_steps).item())
