@@ -30,7 +30,7 @@ import jax.numpy as jnp
 import optimistix as optx
 from equinox._enum import EnumerationItem
 from jax import lax
-from jaxmod.solvers import MultiTrySolution, make_batch_retry_solver
+from jaxmod.solvers import MultiAttemptSolution, make_batch_retry_solver
 from jaxmod.utils import vmap_axes_spec
 from jaxtyping import Array, Bool, Float, Integer, PRNGKeyArray
 from optimistix import Solution
@@ -42,7 +42,21 @@ from atmodeller.engine import objective_function
 LOG_NUMBER_DENSITY_VMAP_AXES: int = 0
 
 
-@eqx.filter_jit
+def make_objective_function_vmapped(parameters: Parameters) -> Callable:
+    """Gets a vmapped, JIT-compiled objective function.
+
+    Args:
+        parameters: Parameters
+
+    Returns:
+        Callable
+    """
+    return eqx.filter_vmap(
+        objective_function, in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters))
+    )
+
+
+# @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solve_single_system(
     initial_guess: Float[Array, "..."], parameters: Parameters, objective_function: Callable
@@ -82,33 +96,33 @@ def make_independent_solver(parameters: Parameters) -> Callable:
         parameters: Parameters
 
     Returns:
-        Callable that returns a :class:`~optimistix.Solution` object
+        Callable that returns a :class:`MultiAttemptSolution` object
     """
     solver_function: Callable = eqx.Partial(
         solve_single_system, objective_function=objective_function
     )
-
-    return eqx.filter_jit(
-        eqx.filter_vmap(
-            solver_function, in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters))
-        )
+    solver_function_vmapped: Callable = eqx.filter_vmap(
+        solver_function, in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters))
     )
 
+    @eqx.filter_jit
+    def solver(solution: Array, parameters: Parameters, *args) -> MultiAttemptSolution:
+        """Solver
 
-def make_objective_function_vmapped(parameters: Parameters) -> Callable:
-    """Gets a vmapped, JIT-compiled objective function.
+        Args:
+            solution: Solution
+            parameters: Parameters
+            *args: Unused positional arguments for consistency with the solver interface
 
-    Args:
-        parameters: Parameters
+        Returns:
+            :class:`MultiAttemptSolution` object
+        """
+        del args
+        sol: optx.Solution = solver_function_vmapped(solution, parameters)
 
-    Returns:
-        Callable
-    """
-    return eqx.filter_jit(
-        eqx.filter_vmap(
-            objective_function, in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters))
-        )
-    )
+        return MultiAttemptSolution(sol)
+
+    return solver
 
 
 def make_batch_solver(parameters: Parameters) -> Callable:
@@ -118,7 +132,7 @@ def make_batch_solver(parameters: Parameters) -> Callable:
         parameters: Parameters
 
     Returns:
-        Callable that returns a :class:`~optimistix.Solution` object
+        Callable that returns a :class:`MultiAttemptSolution` object
     """
     objective_function_vmapped: Callable = make_objective_function_vmapped(parameters)
     solver_function: Callable = eqx.Partial(
@@ -126,8 +140,21 @@ def make_batch_solver(parameters: Parameters) -> Callable:
     )
 
     @eqx.filter_jit
-    def solver(solution: Array, parameters: Parameters) -> optx.Solution:
-        return solver_function(solution, parameters)
+    def solver(solution: Array, parameters: Parameters, *args) -> MultiAttemptSolution:
+        """Solver
+
+        Args:
+            solution: Solution
+            parameters: Parameters
+            *args: Unused positional arguments for consistency with the solver interface
+
+        Returns:
+            :class:`MultiAttemptSolution` object
+        """
+        del args
+        sol: optx.Solution = solver_function(solution, parameters)
+
+        return MultiAttemptSolution(sol)
 
     return solver
 
@@ -138,8 +165,7 @@ def make_tau_sweep_solver(solver_function: Callable, objective_function: Callabl
     ``solver_function`` and ``objective_function`` must support batch evaluations.
 
     Args:
-        solver_function: Callable that performs a single solve and returns a
-            :class:`~optimistix.Solution`` object
+        solver_function: Callable for the solver function
         objective_function: Callable for the objective function
 
     Returns:
@@ -151,13 +177,14 @@ def make_tau_sweep_solver(solver_function: Callable, objective_function: Callabl
     # @eqx.debug.assert_max_traces(max_traces=1)
     def tau_sweep_solver(
         initial_guess: Float[Array, "batch solution"], parameters: Parameters, key: PRNGKeyArray
-    ) -> MultiTrySolution:
+    ) -> MultiAttemptSolution:
         """Solves a batch of solutions for a sequence of tau values using a solver function.
 
         This function iterates over a set of tau values and applies the solver function to the
         batch of solutions at each tau step. It dynamically updates the ``tau`` value in the solver
-        parameters for each iteration. This function is intended to be used inside ``jax.lax.scan``
-        to efficiently sweep over multiple tau values in a single compiled loop.
+        parameters for each iteration. This function is intended to be used inside
+        :func:`jax.lax.scan` to efficiently sweep over multiple tau values in a single compiled
+        loop.
 
         Args:
             initial_guess: Batched array of initial guesses for the solver
@@ -167,7 +194,7 @@ def make_tau_sweep_solver(solver_function: Callable, objective_function: Callabl
             key: JAX PRNG key for reproducible random perturbations
 
         Returns:
-            :class:`~jaxmod.solvers.MultiTrySolution` object
+            :class:`~jaxmod.solvers.MultiAttemptSolution` object
         """
 
         def solve_tau_step(carry: tuple, tau: Float[Array, " batch"]) -> tuple[tuple, tuple]:
@@ -192,7 +219,7 @@ def make_tau_sweep_solver(solver_function: Callable, objective_function: Callabl
             new_parameters: Parameters = eqx.tree_at(get_leaf, parameters, tau)
             # jax.debug.print("tau = {out}", out=new_parameters.solver_parameters.tau)
 
-            new_sol: MultiTrySolution = batch_retry_solver(
+            new_sol: MultiAttemptSolution = batch_retry_solver(
                 solution,
                 new_parameters,
                 subkey,
@@ -220,8 +247,8 @@ def make_tau_sweep_solver(solver_function: Callable, objective_function: Callabl
             [varying_tau_row, constant_tau_row], axis=1
         )
 
-        # Create solver_status as a 1-D array of zeros with the same number of rows as initial_guess
-        solver_status: jnp.ndarray = jnp.zeros(initial_guess.shape[0], dtype=int)
+        # Create solver_status as a 1-D array of zeros with the batch dimension
+        solver_status: Integer[Array, " batch"] = jnp.zeros(initial_guess.shape[0], dtype=int)
 
         tau_array: Float[Array, "tau batch"] = tau_templates[:, solver_status]
 
@@ -242,7 +269,7 @@ def make_tau_sweep_solver(solver_function: Callable, objective_function: Callabl
         sol: Solution = Solution(
             solution[-1], final_result, None, {"num_steps": jnp.max(steps, axis=0)}, None
         )
-        multi_sol: MultiTrySolution = MultiTrySolution(sol, attempts=jnp.max(attempts, axis=0))
+        multi_sol: MultiAttemptSolution = MultiAttemptSolution(sol, jnp.max(attempts, axis=0))
 
         return multi_sol
 
@@ -270,7 +297,7 @@ def make_solver(parameters: Parameters) -> Callable:
         base_solution_array: Float[Array, "batch solution"],
         parameters: Parameters,
         key: PRNGKeyArray,
-    ) -> MultiTrySolution:
+    ) -> MultiAttemptSolution:
         """Wrapped version of the solve function with JIT compilation for branching logic.
 
         Args:
@@ -279,14 +306,14 @@ def make_solver(parameters: Parameters) -> Callable:
             key: Random key
 
         Returns:
-            :class:`~jaxmod.solvers.MultiTrySolution` object
+            :class:`~jaxmod.solvers.MultiAttemptSolution` object
         """
         # Define the condition to check if active stability is enabled
         condition: Bool[Array, ""] = jnp.any(parameters.species.active_stability)
 
         def solve_with_stability_multistart(key):
             """Function for multistart with stability"""
-            subkey = jax.random.split(key)[1]  # Split only once and pass subkey
+            subkey: PRNGKeyArray = jax.random.split(key)[1]  # Split only once and pass subkey
             return tau_sweep_solver(base_solution_array, parameters, subkey)
 
         def solve_with_generic_multistart(key):

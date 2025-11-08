@@ -25,7 +25,8 @@ import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 from jaxmod.constants import GAS_CONSTANT
-from jaxtyping import Array, Bool, Float, Integer
+from jaxmod.solvers import MultiAttemptSolution
+from jaxtyping import Array, Float
 from openpyxl.styles import PatternFill
 
 from atmodeller import override
@@ -167,23 +168,17 @@ class OutputSolution(Output):
     Args:
         parameters: Parameters
         solution: Solution
-        solver_status: Solver status
-        solver_steps: Number of solver steps
-        solver_attempts: Number of solver attempts (multistart)
+        multi_attempt_solution: :class:`~jaxmod.solvers.MultiAttemptSolution` object
     """
 
     def __init__(
         self,
         parameters: Parameters,
         solution: Float[Array, "batch solution"],
-        solver_status: Bool[Array, "..."],
-        solver_steps: Integer[Array, "..."],
-        solver_attempts: Integer[Array, "..."],
+        multi_attempt_solution: MultiAttemptSolution,
     ):
         super().__init__(parameters, solution)
-        self._solver_status: NpBool = np.asarray(solver_status)
-        self._solver_steps: NpInt = np.asarray(solver_steps)
-        self._solver_attempts: NpInt = np.asarray(solver_attempts)
+        self.multi_attempt_solution: MultiAttemptSolution = multi_attempt_solution
 
     @override
     def asdict(self) -> dict[str, dict[str, NpArray]]:
@@ -213,9 +208,10 @@ class OutputSolution(Output):
         out["residual"] = self.residual_asdict()  # type: ignore since keys are int
 
         out["solver"] = {
-            "status": self._solver_status,
-            "steps": self._solver_steps,
-            "attempts": self._solver_attempts,
+            "status": np.asarray(self.multi_attempt_solution.solver_success),
+            "steps": np.asarray(self.multi_attempt_solution.num_steps),
+            "attempts": np.asarray(self.multi_attempt_solution.attempts),
+            "converged": np.asarray(self.multi_attempt_solution.converged),
         }
 
         self._cached_dict = out  # Re-cache result for faster re-accessing
@@ -263,7 +259,7 @@ class OutputSolution(Output):
 
         # Get the indices where the successful_solves mask is False
         unsuccessful_indices: NpArray = np.where(
-            np.array(self._solver_status) == False  # noqa: E712
+            np.asarray(self.multi_attempt_solution.solver_success) == False  # noqa: E712
         )[0]
 
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
@@ -311,4 +307,7 @@ class OutputSolution(Output):
         Returns:
             Dictionary of dataframes without unsuccessful models
         """
-        return {key: df.loc[self._solver_status] for key, df in dataframes.items()}
+        return {
+            key: df.loc[np.asarray(self.multi_attempt_solution.solver_success)]
+            for key, df in dataframes.items()
+        }
