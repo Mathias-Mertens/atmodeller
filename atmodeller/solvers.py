@@ -200,9 +200,10 @@ def make_tau_sweep_solver(solver_function: Callable, objective_function: Callabl
         def solve_tau_step(carry: tuple, tau: Float[Array, " batch"]) -> tuple[tuple, tuple]:
             """Performs a single solver step for a given batch of tau values.
 
-            This function is intended to be used inside :func``jax.lax.scan`` to iterate over multiple
-            tau values efficiently. It updates the ``tau`` leaf in the parameters, calls the
-            :func:`repeat_solver` for the current batch, and returns the updated carry and results.
+            This function is intended to be used inside :func``jax.lax.scan`` to iterate over
+            multiple tau values efficiently. It updates the ``tau`` leaf in the parameters, calls
+            the :func:`repeat_solver` for the current batch, and returns the updated carry and
+            results.
 
             Args:
                 carry: Tuple of carry values
@@ -225,6 +226,7 @@ def make_tau_sweep_solver(solver_function: Callable, objective_function: Callabl
                 subkey,
                 parameters.solver_parameters.multistart_perturbation,
                 parameters.solver_parameters.multistart,
+                parameters.solver_parameters.atol,
             )
 
             new_solution: Float[Array, "batch solution"] = new_sol.value
@@ -325,6 +327,7 @@ def make_solver(parameters: Parameters) -> Callable:
                 subkey,
                 parameters.solver_parameters.multistart_perturbation,
                 parameters.solver_parameters.multistart,
+                parameters.solver_parameters.atol,
             )
 
         multi_sol = lax.cond(
