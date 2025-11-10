@@ -30,7 +30,7 @@ from jaxmod.solvers import RootFindParameters
 from jaxmod.units import unit_conversion
 from jaxmod.utils import as_j64, get_batch_size, partial_rref, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float, Float64
-from molmass import Formula
+from molmass import CompositionItem, Formula
 
 from atmodeller.constants import (
     GAS_STATE,
@@ -727,13 +727,28 @@ class MassConstraints(eqx.Module):
             (max_len, len(species.unique_elements)), np.nan, dtype=np.float64
         )
 
-        # Populate mass constraints
+        # Populate mass constraints. This accommodates mass constraints given as mass or moles of
+        # species as well as elements
         for nn, element in enumerate(species.unique_elements):
-            if element in mass_constraints_.keys():
-                # Broadcasts scalar along that column
-                abundance[:, nn] = mass_constraints_[element]
+            element_sum: ArrayLike = 0
+            for species_, value_ in mass_constraints_.items():
+                try:
+                    element_composition: CompositionItem = Formula(species_).composition()[element]
+                except KeyError:
+                    continue
+                if units == "mass":
+                    # mass fraction
+                    scale: float = element_composition.fraction
+                elif units == "moles":
+                    # element count
+                    scale = element_composition.count
+                element_sum += scale * value_
 
-        # jax.debug.print("log_abundance = {out}", out=log_abundance)
+            if np.any(element_sum != 0):
+                # Broadcasts scalar along that column
+                abundance[:, nn] = element_sum
+
+        # jax.debug.print("abundance = {out}", out=abundance)
 
         return cls(abundance, species, units)
 
