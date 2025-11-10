@@ -24,14 +24,13 @@ from typing import Literal, Optional
 import jax
 import jax.numpy as jnp
 import numpy as np
-import optimistix as optx
-from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
+from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY
 from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
-from atmodeller.solvers import MultiTrySolution, make_independent_solver, make_solver
+from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -148,21 +147,16 @@ class InteriorAtmosphere:
             if solver_type == "basic":
                 self._solver = make_independent_solver(parameters)
                 # Alternatively, could use the batch solver
-                # self._solver = make_batched_solver(parameters)
+                # self._solver = make_batch_solver(parameters)
             elif solver_type == "robust":
                 self._solver = make_solver(parameters)
             self._solver_type = solver_type  # Track current solver type
 
         assert self._solver is not None
-        multi_sol: MultiTrySolution = self._solver(base_solution_array, parameters, subkey)
+        multi_sol: MultiAttemptSolution = self._solver(base_solution_array, parameters, subkey)
 
-        solution = multi_sol.value
-        solver_status = multi_sol.result == optx.RESULTS.successful
-        solver_steps = multi_sol.stats["num_steps"]
-        solver_attempts = multi_sol.attempts
-
-        num_successful_models: int = jnp.count_nonzero(solver_status).item()
-        num_failed_models: int = jnp.count_nonzero(~solver_status).item()
+        num_successful_models: int = jnp.count_nonzero(multi_sol.solver_success).item()
+        num_failed_models: int = jnp.count_nonzero(~multi_sol.solver_success).item()
 
         logger.info(
             "Solve (%s) complete: %d (%0.2f%%) successful model(s)",
@@ -178,7 +172,7 @@ class InteriorAtmosphere:
             )
 
         # Count unique values and their frequencies
-        unique_vals, counts = jnp.unique(solver_attempts, return_counts=True)
+        unique_vals, counts = jnp.unique(multi_sol.attempts, return_counts=True)
         for val, count in zip(unique_vals.tolist(), counts.tolist()):
             logger.info(
                 "Multistart summary: %d (%0.2f%%) models(s) required %d attempt(s)",
@@ -187,11 +181,15 @@ class InteriorAtmosphere:
                 val,
             )
 
-        logger.info("Solver steps (max) = %s", jnp.max(solver_steps).item())
-
-        self._output = OutputSolution(
-            parameters, solution, solver_status, solver_steps, solver_attempts
+        # Want the maximum number of steps for cases that solved
+        mask_num_steps: Bool[Array, " batch"] = (
+            multi_sol.num_steps < parameters.solver_parameters.max_steps
         )
+        # Replace invalid values with -inf so they never win in the max
+        max_less_than_max: Array = jnp.where(mask_num_steps, multi_sol.num_steps, -jnp.inf).max()
+        logger.info("Solver steps (max) = %s", int(max_less_than_max.item()))
+
+        self._output = OutputSolution(parameters, multi_sol.value, multi_sol)
 
 
 def _broadcast_component(
