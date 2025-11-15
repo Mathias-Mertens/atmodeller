@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://github.com/ExPlanetology/atmodeller/blob/main/docs/logo.png" alt="atmodeller logo" width="300"/>
+<img src="https://raw.githubusercontent.com/ExPlanetology/atmodeller/main/docs/logo.png" alt="atmodeller logo" width="300"/>
 </p>
 
 # Atmodeller
