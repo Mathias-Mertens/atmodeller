@@ -529,7 +529,7 @@ class FugacityConstraints(eqx.Module):
 
         return cls(tuple(constraints), unique_species)
 
-    def active(self) -> Array:
+    def active(self) -> Bool[Array, "..."]:
         """Active fugacity constraints
 
         Returns:
@@ -633,7 +633,7 @@ class TotalPressureConstraint(eqx.Module):
         Returns:
             Mask indicating whether the total pressure constraint is active or not
         """
-        return ~jnp.isnan(jnp.atleast_1d(self.log_pressure))
+        return ~jnp.isnan(self.log_pressure)
 
     def asdict(self) -> dict[str, NpArray]:
         """Gets a dictionary of the total pressure constraint as a NumPy array
