@@ -37,11 +37,10 @@ scenarios or parameter sets.
 from collections.abc import Callable
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jax import lax
 from jax.scipy.special import logsumexp
-from jaxmod.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
+from jaxmod.constants import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from jaxmod.units import unit_conversion
 from jaxmod.utils import safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, Shaped
@@ -105,7 +104,7 @@ def get_atmosphere_log_molar_mass(
     return molar_mass
 
 
-# TODO: Remove(?)
+# TODO: remove?
 def get_atmosphere_log_volume(
     parameters: Parameters, log_number_density: Float[Array, " species"]
 ) -> Float[Array, ""]:
@@ -133,7 +132,7 @@ def get_atmosphere_log_volume(
 def get_element_moles(
     parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, " elements"]:
-    """Number of moles of elements in the gas or condensed phase
+    """Gets the number of moles of elements in the gas or condensed phase.
 
     Input values are sanitised only for output routines, where partitioning between condensed and
     gas species is required. For the solver itself, this distinction is unnecessary.
@@ -158,7 +157,7 @@ def get_element_moles(
 def get_element_moles_in_melt(
     parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, " species"]:
-    """Gets the number of moles of elements dissolved in melt
+    """Gets the number of moles of elements dissolved in melt.
 
     Args:
         parameters: Parameters
@@ -431,10 +430,10 @@ def get_species_moles_in_melt(
 
     Args:
         parameters: Parameters
-        log_number_moles: Log number moles
+        log_number_moles: Log number of moles
 
     Returns:
-        Number density of species dissolved in melt
+        Number of moles of species dissolved in melt
     """
     molar_masses: ArrayLike = parameters.species.molar_masses
     melt_mass: Float[Array, ""] = parameters.planet.mantle_melt_mass
@@ -442,16 +441,15 @@ def get_species_moles_in_melt(
     ppmw: Float[Array, " species"] = get_species_ppmw_in_melt(parameters, log_number_moles)
 
     species_melt_moles: Float[Array, " species"] = (
-        ppmw * unit_conversion.ppm_to_fraction * AVOGADRO * melt_mass / molar_masses
+        ppmw * unit_conversion.ppm_to_fraction * melt_mass / molar_masses
     )
-    # jax.debug.print("species_melt_density = {out}", out=species_melt_density)
+    # jax.debug.print("species_melt_moles = {out}", out=species_melt_moles)
 
     return species_melt_moles
 
 
 def get_species_ppmw_in_melt(
-    parameters: Parameters,
-    log_number_moles: Float[Array, " species"],
+    parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, " species"]:
     """Gets the ppmw of species dissolved in melt.
 
@@ -503,6 +501,9 @@ def get_total_pressure(
 
     NOTE: This implements the mechanical pressure formulation only.
 
+    TODO: This could read the total pressure constraint array, use it if something is specified,
+    and otherwise resort to the mechanical pressure balance
+
     Args:
         parameters: Parameters
         log_number_moles: Log number of moles
@@ -551,32 +552,15 @@ def objective_function(
     temperature: Float[Array, ""] = parameters.planet.temperature
 
     log_number_moles, log_stability = jnp.split(solution, 2)
-    jax.debug.print("log_number_moles = {out}", out=log_number_moles)
-    jax.debug.print("log_stability = {out}", out=log_stability)
+    # jax.debug.print("log_number_moles = {out}", out=log_number_moles)
+    # jax.debug.print("log_stability = {out}", out=log_stability)
 
     # Atmosphere
     total_pressure: Float[Array, ""] = get_total_pressure(parameters, log_number_moles)
-    jax.debug.print("total_pressure = {out}", out=total_pressure)
+    # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
     log_activity: Float[Array, " species"] = get_log_activity(parameters, log_number_moles)
-    jax.debug.print("log_activity = {out}", out=log_activity)
-
-    # TODO: Remove. Don't need to compute this anymore with moles
-    # log_volume: Float[Array, ""] = get_atmosphere_log_volume(parameters, log_number_density)
-    # jax.debug.print("log_volume = {out}", out=log_volume)
-
-    # Based on the definition of the reaction constant we need to convert gas activities
-    # (fugacities) from bar to effective number density, whilst keeping condensate activities
-    # unmodified.
-    # FIXME: I don't think this is required if we just use (partial) pressure
-    # log_activity_number_density: Float[Array, " species"] = (
-    #    get_log_number_density_from_log_pressure(log_activity, temperature)
-    # )
-
-    # log_activity_number_density = jnp.where(
-    #    parameters.species.gas_species_mask, log_activity_number_density, log_activity
-    # )
-    # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
+    # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Fugacity constraints residual (dimensionless, log-ratio of number densities)
     # For condensates with an imposed activity, this operation will produce a meaningless numerical
@@ -585,7 +569,7 @@ def objective_function(
     fugacity_residual: Float[Array, " reactions"] = (
         log_activity - parameters.fugacity_constraints.log_fugacity(temperature, total_pressure)
     )
-    jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
+    # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
     # jax.debug.print(
     #     "fugacity_residual min/max: {out}/{out2}",
     #     out=jnp.nanmin(fugacity_residual),
@@ -603,24 +587,24 @@ def objective_function(
     )
 
     log_reaction_equilibrium_constant: Float[Array, " reactions"] = get_log_Kp(parameters)
-    jax.debug.print(
-        "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant.shape
-    )
+    # jax.debug.print(
+    #    "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant.shape
+    # )
     reaction_residual: Float[Array, " reactions"] = (
         reaction_matrix.dot(log_activity) - log_reaction_equilibrium_constant
     )
-    jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual.shape)
+    # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual.shape)
     reaction_stability_mask: Bool[Array, "reactions species"] = jnp.broadcast_to(
         parameters.species.active_stability, reaction_matrix.shape
     )
     reaction_stability_matrix: Float[Array, "reactions species"] = (
         reaction_matrix * reaction_stability_mask
     )
-    jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix.shape)
+    # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix.shape)
 
     # Dimensionless (log K residual)
     reaction_residual = reaction_residual - reaction_stability_matrix.dot(safe_exp(log_stability))
-    jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual.shape)
+    # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual.shape)
     # jax.debug.print(
     #     "reaction_residual min/max: {out}/{out2}",
     #     out=jnp.nanmin(reaction_residual),

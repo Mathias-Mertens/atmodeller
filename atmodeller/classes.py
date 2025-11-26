@@ -26,7 +26,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
-from atmodeller.constants import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY
+from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
 from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
@@ -264,7 +264,7 @@ def broadcast_initial_solution(
     """
     number_density: NpFloat = _broadcast_component(
         initial_log_number_density,
-        INITIAL_LOG_NUMBER_DENSITY,
+        INITIAL_LOG_NUMBER_MOLES,
         number_of_species,
         batch_size,
         name="initial_log_number_density",

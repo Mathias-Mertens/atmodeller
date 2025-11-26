@@ -50,9 +50,6 @@ from atmodeller.thermodata import (
 )
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt
 
-# TODO: remove
-# from atmodeller.utilities import get_log_number_density_from_log_pressure
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -572,10 +569,10 @@ class FugacityConstraints(eqx.Module):
 
         Args:
             temperature: Temperature in K
-            pressure: Pressure
+            pressure: Pressure in bar
 
         Returns:
-            Log fugacity
+            Log fugacity in bar
         """
         # NOTE: Must avoid the late-binding closure issue
         fugacity_funcs: list[Callable] = [
@@ -601,24 +598,6 @@ class FugacityConstraints(eqx.Module):
         # jax.debug.print("log_fugacity = {out}", out=log_fugacity)
 
         return log_fugacity
-
-    # TODO: Remove
-    # def log_number_density(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-    #     """Log number density
-
-    #     Args:
-    #         temperature: Temperature in K
-    #         pressure: Pressure
-
-    #     Returns:
-    #         Log number density
-    #     """
-    #     log_fugacity: Array = self.log_fugacity(temperature, pressure)
-    #     log_number_density: Array = get_log_number_density_from_log_pressure(
-    #         log_fugacity, temperature
-    #     )
-
-    #     return log_number_density
 
 
 class TotalPressureConstraint(eqx.Module):
@@ -665,22 +644,6 @@ class TotalPressureConstraint(eqx.Module):
         out: dict[str, NpArray] = {"total_pressure": np.asarray(np.exp(self.log_pressure))}
 
         return out
-
-    # TODO: remove
-    # def log_number_density(self, temperature: ArrayLike) -> Float[Array, "..."]:
-    #     """Log number density
-
-    #     Args:
-    #         temperature: Temperature in K
-
-    #     Returns:
-    #         Log number density
-    #     """
-    #     log_number_density: Array = get_log_number_density_from_log_pressure(
-    #         self.log_pressure, temperature
-    #     )
-
-    #     return log_number_density
 
 
 class MassConstraints(eqx.Module):
