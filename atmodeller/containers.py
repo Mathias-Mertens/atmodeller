@@ -25,11 +25,11 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
-from jaxmod.constants import AVOGADRO, GRAVITATIONAL_CONSTANT
+from jaxmod.constants import GRAVITATIONAL_CONSTANT
 from jaxmod.solvers import RootFindParameters
 from jaxmod.units import unit_conversion
 from jaxmod.utils import as_j64, get_batch_size, partial_rref, to_hashable
-from jaxtyping import Array, ArrayLike, Bool, Float, Float64
+from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import CompositionItem, Formula
 
 from atmodeller.constants import (
@@ -49,7 +49,9 @@ from atmodeller.thermodata import (
     thermodynamic_data_source,
 )
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt
-from atmodeller.utilities import get_log_number_density_from_log_pressure
+
+# TODO: remove
+# from atmodeller.utilities import get_log_number_density_from_log_pressure
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -600,22 +602,23 @@ class FugacityConstraints(eqx.Module):
 
         return log_fugacity
 
-    def log_number_density(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log number density
+    # TODO: Remove
+    # def log_number_density(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    #     """Log number density
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure
+    #     Args:
+    #         temperature: Temperature in K
+    #         pressure: Pressure
 
-        Returns:
-            Log number density
-        """
-        log_fugacity: Array = self.log_fugacity(temperature, pressure)
-        log_number_density: Array = get_log_number_density_from_log_pressure(
-            log_fugacity, temperature
-        )
+    #     Returns:
+    #         Log number density
+    #     """
+    #     log_fugacity: Array = self.log_fugacity(temperature, pressure)
+    #     log_number_density: Array = get_log_number_density_from_log_pressure(
+    #         log_fugacity, temperature
+    #     )
 
-        return log_number_density
+    #     return log_number_density
 
 
 class TotalPressureConstraint(eqx.Module):
@@ -663,20 +666,21 @@ class TotalPressureConstraint(eqx.Module):
 
         return out
 
-    def log_number_density(self, temperature: ArrayLike) -> Float[Array, "..."]:
-        """Log number density
+    # TODO: remove
+    # def log_number_density(self, temperature: ArrayLike) -> Float[Array, "..."]:
+    #     """Log number density
 
-        Args:
-            temperature: Temperature in K
+    #     Args:
+    #         temperature: Temperature in K
 
-        Returns:
-            Log number density
-        """
-        log_number_density: Array = get_log_number_density_from_log_pressure(
-            self.log_pressure, temperature
-        )
+    #     Returns:
+    #         Log number density
+    #     """
+    #     log_number_density: Array = get_log_number_density_from_log_pressure(
+    #         self.log_pressure, temperature
+    #     )
 
-        return log_number_density
+    #     return log_number_density
 
 
 class MassConstraints(eqx.Module):
@@ -778,21 +782,27 @@ class MassConstraints(eqx.Module):
         else:
             raise ValueError("Units must be 'mass' or 'moles'")
 
-    def abundance_molecules(self) -> Float[Array, "..."]:
-        """Abundance by molecules for all elements
+    # TODO: remove
+    # def abundance_molecules(self) -> Float[Array, "..."]:
+    #     """Abundance by molecules for all elements
 
-        Returns:
-            Abundance by molecules for all elements
-        """
-        return self.abundance_mol() * AVOGADRO
+    #     Returns:
+    #         Abundance by molecules for all elements
+    #     """
+    #     return self.abundance_mol() * AVOGADRO
 
     def log_abundance(self) -> Float[Array, "..."]:
-        """Log abundance by molecules for all elements
+        """Log abundance by moles for all elements
+
+        The array is squeezed to ensure it is consistently 1-D when possible. This avoids
+        unnecessary recompilations when
+        :attr:`~atmodeller.containers.MassConstraints.log_abundance` is sometimes batched and
+        sometimes not.
 
         Returns:
-            Log abundance by molecules for all elements
+            Log abundance by moles for all elements
         """
-        return jnp.log(self.abundance_molecules())
+        return jnp.log(self.abundance_mol()).squeeze()
 
     def asdict(self) -> dict[str, NpArray]:
         """Gets a dictionary of the values as NumPy arrays
@@ -800,7 +810,7 @@ class MassConstraints(eqx.Module):
         Returns:
             A dictionary of the values
         """
-        abundance: NpArray = np.asarray(self.abundance_molecules())
+        abundance: NpArray = np.asarray(self.abundance_mol())
         out: dict[str, NpArray] = {
             f"{element}_number": abundance[:, idx]
             for idx, element in enumerate(self.species.unique_elements)
@@ -822,25 +832,26 @@ class MassConstraints(eqx.Module):
         """
         return ~jnp.isnan(jnp.atleast_1d(self.log_abundance().squeeze()))
 
-    def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Float64[Array, "..."]:
-        """Log number density
+    # TODO: remove
+    # def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Float64[Array, "..."]:
+    #     """Log number density
 
-        The array is squeezed to ensure it is consistently 1-D when possible. This avoids
-        unnecessary recompilations when
-        :attr:`~atmodeller.containers.MassConstraints.log_abundance` is sometimes batched and
-        sometimes not.
+    #     The array is squeezed to ensure it is consistently 1-D when possible. This avoids
+    #     unnecessary recompilations when
+    #     :attr:`~atmodeller.containers.MassConstraints.log_abundance` is sometimes batched and
+    #     sometimes not.
 
-        Args:
-            log_atmosphere_volume: Log volume of the atmosphere
+    #     Args:
+    #         log_atmosphere_volume: Log volume of the atmosphere
 
-        Returns:
-            Log number density
-        """
-        log_number_density: Float64[Array, "..."] = (
-            self.log_abundance().squeeze() - log_atmosphere_volume
-        )
+    #     Returns:
+    #         Log number density
+    #     """
+    #     log_number_density: Float64[Array, "..."] = (
+    #         self.log_abundance().squeeze() - log_atmosphere_volume
+    #     )
 
-        return log_number_density
+    #     return log_number_density
 
 
 class SolverParameters(RootFindParameters):

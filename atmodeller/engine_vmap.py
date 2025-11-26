@@ -36,12 +36,12 @@ from atmodeller.containers import Parameters
 from atmodeller.engine import (
     get_atmosphere_log_molar_mass,
     get_atmosphere_log_volume,
-    get_element_density,
-    get_element_density_in_melt,
+    get_element_moles,
+    get_element_moles_in_melt,
     get_log_activity,
     get_pressure_from_log_number_density,
     get_reactions_only_mask,
-    get_species_density_in_melt,
+    get_species_moles_in_melt,
     get_species_ppmw_in_melt,
     get_total_pressure,
     objective_function,
@@ -76,13 +76,13 @@ class VmappedFunctions:
     # Precompiled vmapped functions
     _get_atmosphere_log_molar_mass: Callable
     _get_atmosphere_log_volume: Callable
-    _get_element_density: Callable
-    _get_element_density_in_melt: Callable
+    _get_element_moles: Callable
+    _get_element_moles_in_melt: Callable
     _get_log_activity: Callable
     _get_log_number_density_from_log_pressure: Callable
     _get_pressure_from_log_number_density: Callable
     _get_reactions_only_mask: Callable
-    _get_species_density_in_melt: Callable
+    _get_species_moles_in_melt: Callable
     _get_species_ppmw_in_melt: Callable
     _get_total_pressure: Callable
     _objective_function_vmap: Callable
@@ -106,12 +106,12 @@ class VmappedFunctions:
         )
 
         self._get_element_density = eqx.filter_vmap(
-            get_element_density,
+            get_element_moles,
             in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._get_element_density_in_melt = eqx.filter_vmap(
-            get_element_density_in_melt,
+            get_element_moles_in_melt,
             in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
@@ -135,8 +135,8 @@ class VmappedFunctions:
             in_axes=(parameters_vmap_axes,),
         )
 
-        self._get_species_density_in_melt = eqx.filter_vmap(
-            get_species_density_in_melt,
+        self._get_species_moles_in_melt = eqx.filter_vmap(
+            get_species_moles_in_melt,
             in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
@@ -161,11 +161,11 @@ class VmappedFunctions:
     def get_atmosphere_log_volume(self, log_number_density: Array) -> Array:
         return self._get_atmosphere_log_volume(self.parameters, log_number_density)
 
-    def get_element_density(self, log_number_density: Array) -> Array:
-        return self._get_element_density(self.parameters, log_number_density)
+    def get_element_moles(self, log_number_density: Array) -> Array:
+        return self._get_element_moles(self.parameters, log_number_density)
 
-    def get_element_density_in_melt(self, log_number_density: Array) -> Array:
-        return self._get_element_density_in_melt(self.parameters, log_number_density)
+    def get_element_moles_in_melt(self, log_number_density: Array) -> Array:
+        return self._get_element_moles_in_melt(self.parameters, log_number_density)
 
     def get_log_activity(self, log_number_density: Array) -> Array:
         return self._get_log_activity(self.parameters, log_number_density)
@@ -181,8 +181,8 @@ class VmappedFunctions:
     def get_reactions_only_mask(self) -> Array:
         return self._get_reactions_only_mask(self.parameters)
 
-    def get_species_density_in_melt(self, log_number_density: Array) -> Array:
-        return self._get_species_density_in_melt(self.parameters, log_number_density)
+    def get_species_moles_in_melt(self, log_number_density: Array) -> Array:
+        return self._get_species_moles_in_melt(self.parameters, log_number_density)
 
     def get_species_ppmw_in_melt(self, log_number_density: Array) -> Array:
         return self._get_species_ppmw_in_melt(self.parameters, log_number_density)

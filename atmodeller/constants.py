@@ -35,7 +35,8 @@ GAS_STATE: str = "g"
 """Suffix to identify gases as per JANAF convention for the state of aggregation"""
 
 # Initial solution guess
-INITIAL_LOG_NUMBER_DENSITY: float = 50.0
+# FIXME: HACK for number of moles. Update variable name.
+INITIAL_LOG_NUMBER_DENSITY: float = 30.0  # 50.0
 """Initial log number density
 
 Empiricially determined. This value is mid-range for Earth-like planets.
