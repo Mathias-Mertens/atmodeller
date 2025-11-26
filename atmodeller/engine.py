@@ -470,6 +470,9 @@ def get_total_pressure(
 ) -> Float[Array, ""]:
     """Gets total pressure.
 
+    A total pressure constraint is used if specified, otherwise the default behaviour is to compute
+    the total pressure from the mechanical pressure balance at the planetary surface.
+
     Args:
         parameters: Parameters
         log_number_moles: Log number of moles
