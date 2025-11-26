@@ -508,7 +508,7 @@ def get_total_pressure(
         log_number_moles: Log number of moles
 
     Returns:
-        Total pressure
+        Total pressure in bar
     """
     gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
         parameters, parameters.species.molar_masses
@@ -521,6 +521,8 @@ def get_total_pressure(
         / parameters.planet.surface_area
     )
     # jax.debug.print("gas_pressure = {out}", out=gas_pressure)
+
+    gas_pressure = gas_pressure * unit_conversion.Pa_to_bar
 
     return jnp.sum(gas_pressure)
 
