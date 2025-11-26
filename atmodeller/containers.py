@@ -745,15 +745,6 @@ class MassConstraints(eqx.Module):
         else:
             raise ValueError("Units must be 'mass' or 'moles'")
 
-    # TODO: remove
-    # def abundance_molecules(self) -> Float[Array, "..."]:
-    #     """Abundance by molecules for all elements
-
-    #     Returns:
-    #         Abundance by molecules for all elements
-    #     """
-    #     return self.abundance_mol() * AVOGADRO
-
     def log_abundance(self) -> Float[Array, "..."]:
         """Log abundance by moles for all elements
 
@@ -794,27 +785,6 @@ class MassConstraints(eqx.Module):
             Mask indicating whether elemental mass constraints are active or not
         """
         return ~jnp.isnan(jnp.atleast_1d(self.log_abundance().squeeze()))
-
-    # TODO: remove
-    # def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Float64[Array, "..."]:
-    #     """Log number density
-
-    #     The array is squeezed to ensure it is consistently 1-D when possible. This avoids
-    #     unnecessary recompilations when
-    #     :attr:`~atmodeller.containers.MassConstraints.log_abundance` is sometimes batched and
-    #     sometimes not.
-
-    #     Args:
-    #         log_atmosphere_volume: Log volume of the atmosphere
-
-    #     Returns:
-    #         Log number density
-    #     """
-    #     log_number_density: Float64[Array, "..."] = (
-    #         self.log_abundance().squeeze() - log_atmosphere_volume
-    #     )
-
-    #     return log_number_density
 
 
 class SolverParameters(RootFindParameters):
