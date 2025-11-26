@@ -60,18 +60,16 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     """
     fugacity_mask: Bool[Array, " dim"] = parameters.fugacity_constraints.active()
     reactions_mask: ArrayLike = parameters.species.active_reactions
-    total_pressure_mask: ArrayLike = parameters.total_pressure_constraint.active()
     mass_mask: Bool[Array, " dim"] = parameters.mass_constraints.active()
     stability_mask: ArrayLike = parameters.species.active_stability
 
     # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
     # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
-    # jax.debug.print("total_pressure_mask = {out}", out=total_pressure_mask)
     # jax.debug.print("mass_mask = {out}", out=mass_mask)
     # jax.debug.print("stability_mask = {out}", out=stability_mask)
 
     active_mask: Bool[Array, " dim"] = jnp.concatenate(
-        (fugacity_mask, reactions_mask, total_pressure_mask, mass_mask, stability_mask)
+        (fugacity_mask, reactions_mask, mass_mask, stability_mask)
     )
     # jax.debug.print("active_mask = {out}", out=active_mask)
 
@@ -314,33 +312,6 @@ def get_log_pressure_from_log_number_density(
     return log_pressure
 
 
-# TODO: remove
-# def get_log_reaction_equilibrium_constant(parameters: Parameters) -> Float[Array, " reactions"]:
-#     """Gets the log equilibrium constant of each reaction.
-
-#     Args:
-#         parameters: Parameters
-
-#     Returns:
-#         Log equilibrium constant of each reaction, hidden unit base of molecules/m^3
-#     """
-#     reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
-#         parameters.species.reaction_matrix
-#     )
-#     log_Kp: Float[Array, " reactions"] = get_log_Kp(parameters)
-#     # jax.debug.print("lnKp = {out}", out=lnKp)
-#     delta_n: Float[Array, " reactions"] = jnp.sum(
-#         reaction_matrix * parameters.species.gas_species_mask, axis=1
-#     )
-#     # jax.debug.print("delta_n = {out}", out=delta_n)
-#     log_Kc: Float[Array, " reactions"] = log_Kp - delta_n * (
-#         jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(parameters.planet.temperature)
-#     )
-#     # jax.debug.print("log10Kc = {out}", out=log_Kc)
-
-#     return log_Kc
-
-
 def get_min_log_elemental_abundance_per_species(
     parameters: Parameters,
 ) -> Float[Array, " species"]:
@@ -499,11 +470,6 @@ def get_total_pressure(
 ) -> Float[Array, ""]:
     """Gets total pressure.
 
-    NOTE: This implements the mechanical pressure formulation only.
-
-    TODO: This could read the total pressure constraint array, use it if something is specified,
-    and otherwise resort to the mechanical pressure balance
-
     Args:
         parameters: Parameters
         log_number_moles: Log number of moles
@@ -511,21 +477,34 @@ def get_total_pressure(
     Returns:
         Total pressure in bar
     """
+    # Check whether user supplied an explicit total-pressure constraint
+    constraint_active: Bool[Array, ""] = parameters.total_pressure_constraint.active()
+
+    # Option 1: Mechanical pressure balance
     gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
         parameters, parameters.species.molar_masses
     )
-    gas_pressure: Float[Array, " species"] = (
+    mechanical_pressure_species: Float[Array, " species"] = (
         jnp.exp(log_number_moles)
         * gas_molar_mass
-        # TODO: Could multiply below just once after the sum
         * parameters.planet.surface_gravity
         / parameters.planet.surface_area
     )
-    # jax.debug.print("gas_pressure = {out}", out=gas_pressure)
+    mechanical_pressure: Float[Array, ""] = (
+        jnp.sum(mechanical_pressure_species) * unit_conversion.Pa_to_bar
+    )
+    # jax.debug.print("mechanical_pressure = {out}", out=mechanical_pressure)
 
-    gas_pressure = gas_pressure * unit_conversion.Pa_to_bar
+    # Option 2: Imposed pressure
+    imposed_pressure: Float[Array, ""] = jnp.exp(parameters.total_pressure_constraint.log_pressure)
+    # jax.debug.print("imposed_pressure = {out}", out=imposed_pressure)
 
-    return jnp.sum(gas_pressure)
+    total_pressure: Float[Array, ""] = jnp.where(
+        constraint_active, imposed_pressure, mechanical_pressure
+    )
+    # jax.debug.print("total_pressure = {out}", out=total_pressure)
+
+    return total_pressure
 
 
 def objective_function(
@@ -622,14 +601,6 @@ def objective_function(
     #    jnp.log(total_pressure), temperature
     # )
 
-    # FIXME: Pressure should be imposed as a hard constraint by get_total_pressure, which can
-    # accommodate both the mechanical pressure balance or an imposed pressure
-    total_pressure_residual: Float[Array, ""] = (
-        jnp.log(total_pressure) - parameters.total_pressure_constraint.log_pressure
-    )
-    # Must be 1-D for concatenation with other residual terms
-    total_pressure_residual = jnp.atleast_1d(total_pressure_residual)
-
     # Elemental mass balance residual
     # Number of moles of elements in the gas or condensed phase
     element_moles: Float[Array, " elements"] = get_element_moles(parameters, log_number_moles)
@@ -694,7 +665,6 @@ def objective_function(
         [
             fugacity_residual,
             reaction_residual,
-            total_pressure_residual,
             mass_residual,
             stability_residual,
         ]
