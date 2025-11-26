@@ -595,12 +595,6 @@ def objective_function(
     #     out2=jnp.nanstd(reaction_residual),
     # )
 
-    # Log total pressure (number density) residual
-    # TODO: Remove
-    # log_total_number_density: Float[Array, ""] = get_log_number_density_from_log_pressure(
-    #    jnp.log(total_pressure), temperature
-    # )
-
     # Elemental mass balance residual
     # Number of moles of elements in the gas or condensed phase
     element_moles: Float[Array, " elements"] = get_element_moles(parameters, log_number_moles)
