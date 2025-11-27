@@ -340,20 +340,21 @@ class Output:
 
         return elements_out
 
-    def element_moles_condensed(self) -> NpFloat:
+    def element_density_condensed(self) -> NpFloat:
         """Gets the number density of elements in the condensed phase.
 
         Returns:
             Number density of elements in the condensed phase
         """
         condensed_species_mask: NpFloat = np.where(self.condensed_species_mask, 1.0, np.nan)
-        element_density: Array = self.vmapf.get_element_moles(
+        element_moles: Array = self.vmapf.get_element_moles(
             jnp.asarray(self.log_number_moles) * condensed_species_mask
         )
+        element_density = element_moles * AVOGADRO / self.atmosphere_volume()
 
         return np.asarray(element_density)
 
-    def element_moles_dissolved(self) -> NpFloat:
+    def element_density_dissolved(self) -> NpFloat:
         """Gets the number density of elements dissolved in melt due to species solubility.
 
         Returns:
@@ -362,8 +363,9 @@ class Output:
         element_moles_dissolved: Array = self.vmapf.get_element_moles_in_melt(
             jnp.asarray(self.log_number_moles)
         )
+        element_density = element_moles_dissolved * AVOGADRO / self.atmosphere_volume()
 
-        return np.asarray(element_moles_dissolved)
+        return np.asarray(element_density)
 
     def element_density_gas(self) -> NpFloat:
         """Gets the number density of elements in the gas phase.
@@ -372,9 +374,10 @@ class Output:
             Number density of elements in the gas phase
         """
         gas_species_mask: NpFloat = np.where(self.gas_species_mask, 1.0, np.nan)
-        element_density: Array = self.vmapf.get_element_density(
-            jnp.asarray(self.log_number_density) * gas_species_mask,
+        element_moles: Array = self.vmapf.get_element_moles(
+            jnp.asarray(self.log_number_moles) * gas_species_mask,
         )
+        element_density = element_moles * AVOGADRO / self.atmosphere_volume()
 
         return np.asarray(element_density)
 
