@@ -576,7 +576,7 @@ class Output:
         species_names: tuple[str, ...] = self.species.species_names
 
         for ii, species_name in enumerate(species_names):
-            raw_solution[species_name] = self.log_number_density[:, ii]
+            raw_solution[species_name] = self.log_number_moles[:, ii]
             raw_solution[f"{species_name}_stability"] = self.log_stability[:, ii]
 
         # Remove keys where the array values are all nan
