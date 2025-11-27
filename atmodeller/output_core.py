@@ -405,9 +405,8 @@ class Output:
         Returns
             Dictionary of output quantities
         """
-        atmosphere_volume: NpArray = self.atmosphere_volume()
         # Volume must be a column vector because it multiples all elements in the row
-        number: NpArray = number_density * atmosphere_volume[:, np.newaxis]
+        number: NpArray = number_density * self.atmosphere_volume()[:, np.newaxis]
         moles: NpArray = number / AVOGADRO
         mass: NpArray = moles * molar_mass_expanded
 
@@ -540,8 +539,8 @@ class Output:
         Returns:
             Pressure of species in bar
         """
-        pressure: Array = self.vmapf.get_pressure_from_log_number_density(
-            jnp.asarray(self.log_number_density)
+        pressure: NpFloat = (
+            self.number_moles * GAS_CONSTANT_BAR * self.temperature / self.atmosphere_volume()
         )
 
         return np.asarray(pressure)
@@ -606,9 +605,10 @@ class Output:
         Returns:
             Species number density in the melt
         """
-        species_density_in_melt: Array = self.vmapf.get_species_density_in_melt(
-            jnp.asarray(self.log_number_density)
+        species_moles_in_melt: Array = self.vmapf.get_species_moles_in_melt(
+            jnp.asarray(self.log_number_moles)
         )
+        species_density_in_melt = species_moles_in_melt * AVOGADRO / self.atmosphere_volume()
 
         return np.asarray(species_density_in_melt)
 
