@@ -255,7 +255,7 @@ class Output:
         Returns:
             Total pressure
         """
-        total_pressure: Array = self.vmapf.get_total_pressure(jnp.asarray(self.log_number_density))
+        total_pressure: Array = self.vmapf.get_total_pressure(jnp.asarray(self.log_number_moles))
 
         return np.asarray(total_pressure)
 
