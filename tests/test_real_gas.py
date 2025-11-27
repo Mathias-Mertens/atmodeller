@@ -136,7 +136,7 @@ def test_chabrier_subNeptune(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune
 
     This case effectively saturates the maximum allowable log number density at a value of 70
-    based on the default hypercube that brackets the solution (see LOG_NUMBER_DENSITY_UPPER).
+    based on the default hypercube that brackets the solution (see LOG_NUMBER_MOLES_UPPER).
     This is fine for a test, but this test is not physically realistic because solubilities are
     ignored, which would greatly lower the pressure and hence the number density.
     """
