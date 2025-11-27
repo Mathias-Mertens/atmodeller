@@ -331,8 +331,6 @@ def get_min_log_elemental_abundance_per_species(
     # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
     # jax.debug.print("mask = {out}", out=mask)
 
-    # FIXME: Added a squeeze to log_abundance compared to the original value. Below might need to
-    # be changed.
     # log_abundance is a 1-D array, which cannot be transposed, so make a 2-D array
     log_abundance: Float[Array, "elements 1"] = jnp.atleast_2d(
         parameters.mass_constraints.log_abundance()
@@ -633,13 +631,10 @@ def objective_function(
     #     out2=jnp.nanstd(mass_residual),
     # )
 
-    # TODO: These need checking if they make sense with log_volume now not appearing
     # Stability residual
-    log_min_number_moles: Float[Array, " species"] = (
-        get_min_log_elemental_abundance_per_species(parameters)
-        # - log_volume # TODOL remove
-        + jnp.log(parameters.solver_parameters.tau)
-    )
+    log_min_number_moles: Float[Array, " species"] = get_min_log_elemental_abundance_per_species(
+        parameters
+    ) + jnp.log(parameters.solver_parameters.tau)
     # jax.debug.print("log_min_number_density = {out}", out=log_min_number_density)
     # Dimensionless (log-ratio)
     stability_residual: Float[Array, " species"] = (
