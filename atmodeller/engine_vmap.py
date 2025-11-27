@@ -35,7 +35,6 @@ from jaxtyping import Array, ArrayLike
 from atmodeller.containers import Parameters
 from atmodeller.engine import (
     get_atmosphere_log_molar_mass,
-    # get_atmosphere_log_volume,
     get_element_moles,
     get_element_moles_in_melt,
     get_log_activity,
