@@ -25,7 +25,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from jaxmod.constants import AVOGADRO
+from jaxmod.constants import AVOGADRO, GAS_CONSTANT_BAR
 from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import Formula
@@ -237,14 +237,17 @@ class Output:
         """
         return np.exp(self.atmosphere_log_molar_mass())
 
-    # TODO: Get from ideal gas law
-    # def atmosphere_volume(self) -> NpFloat:
-    #     """Gets the volume of the atmosphere.
+    def atmosphere_volume(self) -> NpFloat:
+        """Gets the volume of the atmosphere.
 
-    #     Returns:
-    #         Volume of the atmosphere
-    #     """
-    #     return np.exp(self.atmosphere_log_volume())
+        Returns:
+            Volume of the atmosphere
+        """
+        # Total number of moles in the atmosphere
+        n: NpFloat = np.sum(self.number_moles[:, self.gas_species_mask], axis=1)
+        volume: NpFloat = (n * GAS_CONSTANT_BAR * self.temperature) / self.total_pressure()
+
+        return volume
 
     def total_pressure(self) -> NpFloat:
         """Gets total pressure.
