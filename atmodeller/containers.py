@@ -34,8 +34,8 @@ from molmass import CompositionItem, Formula
 
 from atmodeller.constants import (
     GAS_STATE,
-    LOG_NUMBER_DENSITY_LOWER,
-    LOG_NUMBER_DENSITY_UPPER,
+    LOG_NUMBER_MOLES_LOWER,
+    LOG_NUMBER_MOLES_UPPER,
     LOG_STABILITY_LOWER,
     LOG_STABILITY_UPPER,
     TAU,
@@ -855,7 +855,7 @@ class SolverParameters(RootFindParameters):
             Lower bound for truncating the solution during the solve
         """
         return self._get_hypercube_bound(
-            number_species, LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER
+            number_species, LOG_NUMBER_MOLES_LOWER, LOG_STABILITY_LOWER
         )
 
     def _get_upper_bound(self, number_species: int) -> Float[Array, " dim"]:
@@ -868,7 +868,7 @@ class SolverParameters(RootFindParameters):
             Upper bound for truncating the solution during the solve
         """
         return self._get_hypercube_bound(
-            number_species, LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER
+            number_species, LOG_NUMBER_MOLES_UPPER, LOG_STABILITY_UPPER
         )
 
     def _get_hypercube_bound(

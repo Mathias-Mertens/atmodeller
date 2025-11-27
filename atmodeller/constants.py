@@ -36,7 +36,7 @@ GAS_STATE: str = "g"
 
 # Initial solution guess
 INITIAL_LOG_NUMBER_MOLES: float = 50.0
-"""Initial log number moles
+"""Initial log number of moles
 
 Empiricially determined. This value is mid-range for Earth-like planets.
 """
@@ -52,17 +52,17 @@ MAX_EXP_INPUT: float = np.log(np.finfo(np.float64).max)
 MIN_EXP_INPUT: float = np.log(np.finfo(np.float64).tiny)
 
 # Lower and upper bounds on the hypercube which contains the root
-LOG_NUMBER_DENSITY_LOWER: float = -170.0
-"""Lower log number density for a species
+LOG_NUMBER_MOLES_LOWER: float = -170.0
+"""Lower log number of moles for a species
 
-For a gas species this corresponds to ``3.17E-77`` bar and ``3.16E-78`` bar at ``3000`` K and
-``298`` K, respectively.
+TODO: Update For a gas species this corresponds to ``3.17E-77`` bar and ``3.16E-78`` bar at 
+``3000`` K and ``298`` K, respectively.
 """
-LOG_NUMBER_DENSITY_UPPER: float = 80.0
-"""Upper log number density for a species
+LOG_NUMBER_MOLES_UPPER: float = 80.0
+"""Upper log number of moles for a species
 
-For a gas species this corresponds to ``2294896`` GPa and ``227960`` GPa at ``3000`` K and ``298`` 
-K, respectively. However, the choice of this upper limit is actually motivated by condensed
+TODO: For a gas species this corresponds to ``2294896`` GPa and ``227960`` GPa at ``3000`` K and 
+``298`` K, respectively. However, the choice of this upper limit is actually motivated by condensed
 species.
 """
 LOG_STABILITY_LOWER: float = -700.0  # basically the same as MIN_EXP_INPUT
