@@ -38,7 +38,6 @@ from atmodeller.engine import (
     get_element_moles,
     get_element_moles_in_melt,
     get_log_activity,
-    get_pressure_from_log_number_density,
     get_reactions_only_mask,
     get_species_moles_in_melt,
     get_species_ppmw_in_melt,
@@ -78,7 +77,6 @@ class VmappedFunctions:
     _get_element_moles_in_melt: Callable
     _get_log_activity: Callable
     _get_log_number_density_from_log_pressure: Callable
-    _get_pressure_from_log_number_density: Callable
     _get_reactions_only_mask: Callable
     _get_species_moles_in_melt: Callable
     _get_species_ppmw_in_melt: Callable
@@ -98,12 +96,12 @@ class VmappedFunctions:
             in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
-        self._get_element_density = eqx.filter_vmap(
+        self._get_element_moles = eqx.filter_vmap(
             get_element_moles,
             in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
-        self._get_element_density_in_melt = eqx.filter_vmap(
+        self._get_element_moles_in_melt = eqx.filter_vmap(
             get_element_moles_in_melt,
             in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
@@ -116,11 +114,6 @@ class VmappedFunctions:
         self._get_log_number_density_from_log_pressure = eqx.filter_vmap(
             get_log_number_density_from_log_pressure,
             in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, temperature_vmap_axes),
-        )
-
-        self._get_pressure_from_log_number_density = eqx.filter_vmap(
-            get_pressure_from_log_number_density,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._get_reactions_only_mask = eqx.filter_vmap(
@@ -164,9 +157,6 @@ class VmappedFunctions:
         self, log_pressure: ArrayLike, temperature: ArrayLike
     ) -> Array:
         return self._get_log_number_density_from_log_pressure(log_pressure, temperature)
-
-    def get_pressure_from_log_number_density(self, log_number_density: Array) -> Array:
-        return self._get_pressure_from_log_number_density(self.parameters, log_number_density)
 
     def get_reactions_only_mask(self) -> Array:
         return self._get_reactions_only_mask(self.parameters)

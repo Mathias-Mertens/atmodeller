@@ -325,22 +325,6 @@ def get_min_log_elemental_abundance_per_species(
     return min_abundance_per_species
 
 
-# TODO: remove?
-def get_pressure_from_log_number_density(
-    parameters: Parameters, log_number_density: Float[Array, " species"]
-) -> Float[Array, " species"]:
-    """Gets pressure from log number density.
-
-    Args:
-        parameters: Parameters
-        log_number_density: Log number density
-
-    Returns:
-        Pressure
-    """
-    return safe_exp(get_log_pressure_from_log_number_density(parameters, log_number_density))
-
-
 def get_reactions_only_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     """Returns a mask with `True` only for active reactions positions, `False` elsewhere.
 
