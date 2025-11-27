@@ -491,9 +491,7 @@ class Output:
         # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 
         log_activity: NpFloat = np.where(
-            condition_broadcasted,
-            log_activity_with_stability,
-            log_activity_without_stability,
+            condition_broadcasted, log_activity_with_stability, log_activity_without_stability
         )
 
         return log_activity
