@@ -224,7 +224,7 @@ class Output:
             Log molar mass of the atmosphere
         """
         atmosphere_log_molar_mass: Array = self.vmapf.get_atmosphere_log_molar_mass(
-            jnp.asarray(self.log_number_density)
+            jnp.asarray(self.log_number_moles)
         )
 
         return np.asarray(atmosphere_log_molar_mass)
