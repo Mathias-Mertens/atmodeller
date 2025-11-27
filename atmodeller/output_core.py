@@ -502,7 +502,7 @@ class Output:
         Returns:
             Log activity without stability
         """
-        log_activity: Array = self.vmapf.get_log_activity(jnp.asarray(self.log_number_density))
+        log_activity: Array = self.vmapf.get_log_activity(jnp.asarray(self.log_number_moles))
 
         return np.asarray(log_activity)
 
