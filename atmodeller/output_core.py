@@ -511,7 +511,7 @@ class Output:
         Returns:
             Number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
         """
-        return np.exp(self.log_number_density)
+        return np.exp(self.log_number_moles) * AVOGADRO / self.atmosphere_volume()[:, np.newaxis]
 
     def reaction_mask(self) -> NpBool:
         """Gets the reaction mask of the residual array.
@@ -543,7 +543,7 @@ class Output:
             self.number_moles * GAS_CONSTANT_BAR * self.temperature / self.atmosphere_volume()
         )
 
-        return np.asarray(pressure)
+        return pressure
 
     def quick_look(self) -> dict[str, ArrayLike]:
         """Quick look at the solution
