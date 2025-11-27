@@ -35,7 +35,7 @@ from jaxtyping import Array, ArrayLike
 from atmodeller.containers import Parameters
 from atmodeller.engine import (
     get_atmosphere_log_molar_mass,
-    get_atmosphere_log_volume,
+    # get_atmosphere_log_volume,
     get_element_moles,
     get_element_moles_in_melt,
     get_log_activity,
@@ -75,7 +75,6 @@ class VmappedFunctions:
 
     # Precompiled vmapped functions
     _get_atmosphere_log_molar_mass: Callable
-    _get_atmosphere_log_volume: Callable
     _get_element_moles: Callable
     _get_element_moles_in_melt: Callable
     _get_log_activity: Callable
@@ -97,11 +96,6 @@ class VmappedFunctions:
         # Pre-build vmap wrappers
         self._get_atmosphere_log_molar_mass = eqx.filter_vmap(
             get_atmosphere_log_molar_mass,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
-        )
-
-        self._get_atmosphere_log_volume = eqx.filter_vmap(
-            get_atmosphere_log_volume,
             in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
@@ -157,9 +151,6 @@ class VmappedFunctions:
 
     def get_atmosphere_log_molar_mass(self, log_number_density: Array) -> Array:
         return self._get_atmosphere_log_molar_mass(self.parameters, log_number_density)
-
-    def get_atmosphere_log_volume(self, log_number_density: Array) -> Array:
-        return self._get_atmosphere_log_volume(self.parameters, log_number_density)
 
     def get_element_moles(self, log_number_density: Array) -> Array:
         return self._get_element_moles(self.parameters, log_number_density)

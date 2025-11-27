@@ -40,7 +40,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jax import lax
 from jax.scipy.special import logsumexp
-from jaxmod.constants import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
+from jaxmod.constants import BOLTZMANN_CONSTANT_BAR
 from jaxmod.units import unit_conversion
 from jaxmod.utils import safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, Shaped
@@ -100,31 +100,6 @@ def get_atmosphere_log_molar_mass(
     # jax.debug.print("molar_mass = {out}", out=molar_mass)
 
     return molar_mass
-
-
-# TODO: remove?
-def get_atmosphere_log_volume(
-    parameters: Parameters, log_number_density: Float[Array, " species"]
-) -> Float[Array, ""]:
-    """Gets the log volume of the atmosphere.
-
-    Args:
-        parameters: Parameters
-        log_number_density: Log number density
-
-    Returns:
-        Log volume of the atmosphere
-    """
-    log_volume: Float[Array, ""] = (
-        jnp.log(GAS_CONSTANT)
-        + jnp.log(parameters.planet.temperature)
-        - get_atmosphere_log_molar_mass(parameters, log_number_density)
-        + jnp.log(parameters.planet.surface_area)
-        - jnp.log(parameters.planet.surface_gravity)
-    )
-    # jax.debug.print("log_volume = {out}", out=log_volume)
-
-    return log_volume
 
 
 def get_element_moles(
