@@ -619,7 +619,7 @@ class Output:
             Species ppmw in the melt
         """
         species_ppmw_in_melt: Array = self.vmapf.get_species_ppmw_in_melt(
-            jnp.asarray(self.log_number_density)
+            jnp.asarray(self.log_number_moles)
         )
 
         return np.asarray(species_ppmw_in_melt)
