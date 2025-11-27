@@ -80,6 +80,11 @@ class Output:
         return self.parameters.species.molar_masses
 
     @property
+    def number_moles(self) -> NpFloat:
+        """Number of moles of all species"""
+        return np.exp(self.log_number_moles)
+
+    @property
     def number_solutions(self) -> int:
         """Number of solutions"""
         return self.parameters.batch_size
