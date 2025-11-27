@@ -232,25 +232,14 @@ class Output:
         """
         return np.exp(self.atmosphere_log_molar_mass())
 
-    def atmosphere_log_volume(self) -> NpFloat:
-        """Gets the log volume of the atmosphere.
+    # TODO: Get from ideal gas law
+    # def atmosphere_volume(self) -> NpFloat:
+    #     """Gets the volume of the atmosphere.
 
-        Returns:
-            Log volume of the atmosphere
-        """
-        atmosphere_log_volume: Array = self.vmapf.get_atmosphere_log_volume(
-            jnp.asarray(self.log_number_density)
-        )
-
-        return np.asarray(atmosphere_log_volume)
-
-    def atmosphere_volume(self) -> NpFloat:
-        """Gets the volume of the atmosphere.
-
-        Returns:
-            Volume of the atmosphere
-        """
-        return np.exp(self.atmosphere_log_volume())
+    #     Returns:
+    #         Volume of the atmosphere
+    #     """
+    #     return np.exp(self.atmosphere_log_volume())
 
     def total_pressure(self) -> NpFloat:
         """Gets total pressure.
