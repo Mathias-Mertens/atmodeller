@@ -649,6 +649,12 @@ class TotalPressureConstraint(eqx.Module):
 class MassConstraints(eqx.Module):
     """Mass constraints of elements
 
+    Note:
+        ``abundance`` must be stored as a 2-D array so that the vmapping operation only batches
+        over the leading dimension if it has a size greater than unity. Then, the methods that
+        process ``abundance`` consistently return 1-D arrays, shape (elements,), to avoid
+        triggering JAX recompilation.
+
     Args:
         abundance: Abundance
         species: Species
@@ -746,17 +752,32 @@ class MassConstraints(eqx.Module):
             raise ValueError("Units must be 'mass' or 'moles'")
 
     def log_abundance(self) -> Float[Array, "..."]:
-        """Log abundance by moles for all elements
+        """Element abundances in log-space
 
-        The array is squeezed to ensure it is consistently 1-D when possible. This avoids
-        unnecessary recompilations when
-        :attr:`~atmodeller.containers.MassConstraints.log_abundance` is sometimes batched and
-        sometimes not.
+        ``abundance`` is stored as a 2-D array with shape (batch, elements) so that ``vmap`` only
+        maps over the leading dimension when batching is active. When called inside a ``vmap``,
+        each mapped instance receives a single row of the abundance matrix, i.e. an array of shape
+        (elements,). When called outside ``vmap``, ``abundance`` has shape (1, elements) and must
+        be reduced to a consistent 1-D vector.
+
+        If the batch dimension is greater than one and the method is called outside a vmapped
+        workflow, the full 2-D log-abundance array is returned unchanged. This preserves the
+        natural behaviour for genuinely batched data while still collapsing the leading singleton
+        dimension in unbatched use.
 
         Returns:
             Log abundance by moles for all elements
         """
-        return jnp.log(self.abundance_mol()).squeeze()
+        log_abundance: Float[Array, "..."] = jnp.log(self.abundance_mol())
+
+        # Ensure stable 1-D output:
+        #  - Unbatched case: shape (1, elements) --> (elements,)
+        #  - Vmapped case: shape (elements,) --> already correct
+        # ``squeeze`` removes the leading singleton, and ``atleast_1d`` guards against accidental
+        # collapse when only a single element exists.
+        log_abundance = jnp.atleast_1d(log_abundance.squeeze())
+
+        return log_abundance
 
     def asdict(self) -> dict[str, NpArray]:
         """Gets a dictionary of the values as NumPy arrays
@@ -776,15 +797,10 @@ class MassConstraints(eqx.Module):
     def active(self) -> Bool[Array, "..."]:
         """Active mass constraints
 
-        The array is squeezed to ensure it is consistently 1-D when possible. This avoids
-        unnecessary recompilations when
-        :attr:`~atmodeller.containers.MassConstraints.log_abundance` is sometimes batched and
-        sometimes not.
-
         Returns:
             Mask indicating whether elemental mass constraints are active or not
         """
-        return ~jnp.isnan(jnp.atleast_1d(self.log_abundance().squeeze()))
+        return ~jnp.isnan(self.log_abundance())
 
 
 class SolverParameters(RootFindParameters):
