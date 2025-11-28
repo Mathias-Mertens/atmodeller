@@ -62,7 +62,7 @@ All gas species
      - Number density in all reservoirs
    * - volume_mixing_ratio
      - mol mol\ :math:`^{-1}`
-     - Volume mixing ratio (gas)
+     - Volume mixing ratio
    * - gas_mass_fraction
      - kg kg\ :math:`^{-1}`
      - Mass fraction in the gas phase
@@ -171,7 +171,7 @@ Element outputs have a dictionary key associated with the element name with an `
      - Number density in all reservoirs
    * - volume_mixing_ratio
      - mol mol\ :math:`^{-1}`
-     - Volume mixing ratio (gas)
+     - Volume mixing ratio
 
 Planet
 ------
