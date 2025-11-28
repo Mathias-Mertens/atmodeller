@@ -97,11 +97,11 @@ class Species(eqx.Module):
         """
         species_data: IndividualSpeciesData = IndividualSpeciesData(formula, state)
 
-        # For a condensate, either both a number density and stability are solved for, or
-        # alternatively stability can be enforced in which case the number density is irrelevant
-        # and there is nothing to solve for.
+        # For a condensate, either both a number of moles and stability are solved for, or
+        # alternatively stability can be enforced in which case the number of moles is
+        # irrelevant and there is nothing to solve for.
         # TODO: Theoretically the scenario could be accommodated whereby a user enforces stability
-        # and wants to solve for the number density. But this could give rise to strange
+        # and wants to solve for the number of moles. But this could give rise to strange
         # inconsistencies so this scenario is not accommodated.
         number_solution: int = 2 if solve_for_stability else 0
 
@@ -132,7 +132,7 @@ class Species(eqx.Module):
         """
         species_data: IndividualSpeciesData = IndividualSpeciesData(formula, state)
 
-        # For a gas, a number density is always solved for, and stability can be if desired
+        # For a gas, the number of moles is always solved for, and stability can be if desired
         number_solution: int = 2 if solve_for_stability else 1
 
         return cls(species_data, activity, solubility, solve_for_stability, number_solution)

@@ -77,8 +77,8 @@ TAU_MAX: float = 1.0e-3
 TAU: float = 1.0e-25
 """Desired (i.e. final/minimium) tau scaling factor for species stability :cite:p:`LKK16`.
 
-Tau effectively controls the minimum non-zero number density of unstable species. Formally, it
-defines the number density of an unstable pure condensate with an activity of ``1/e``, which
+Tau effectively controls the minimum non-zero number of moles of unstable species. Formally, it
+defines the number of moles of an unstable pure condensate with an activity of ``1/e``, which
 corresponds to a log stability of zero.
 
 This value is typically appropriate for condensate stability only, but if you additionally apply 

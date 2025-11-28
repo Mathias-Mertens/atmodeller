@@ -39,7 +39,7 @@ from atmodeller.constants import TAU, TAU_MAX, TAU_NUM
 from atmodeller.containers import Parameters
 from atmodeller.engine import objective_function
 
-LOG_NUMBER_DENSITY_VMAP_AXES: int = 0
+LOG_NUMBER_MOLES_VMAP_AXES: int = 0
 
 
 def make_objective_function_vmapped(parameters: Parameters) -> Callable:
@@ -52,7 +52,7 @@ def make_objective_function_vmapped(parameters: Parameters) -> Callable:
         Callable
     """
     return eqx.filter_vmap(
-        objective_function, in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters))
+        objective_function, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
     )
 
 
@@ -102,7 +102,7 @@ def make_independent_solver(parameters: Parameters) -> Callable:
         solve_single_system, objective_function=objective_function
     )
     solver_function_vmapped: Callable = eqx.filter_vmap(
-        solver_function, in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters))
+        solver_function, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
     )
 
     @eqx.filter_jit

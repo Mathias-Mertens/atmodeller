@@ -478,10 +478,7 @@ def objective_function(
     log_activity: Float[Array, " species"] = get_log_activity(parameters, log_number_moles)
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
-    # Fugacity constraints residual (dimensionless, log-ratio of number densities)
-    # For condensates with an imposed activity, this operation will produce a meaningless numerical
-    # value because it doesn't make sense to convert a condensate activity of unity to a
-    # log_number_density. However, this meaningless value is masked out at the end of the function.
+    # Fugacity constraints residual (dimensionless)
     fugacity_residual: Float[Array, " reactions"] = (
         log_activity - parameters.fugacity_constraints.log_fugacity(temperature, total_pressure)
     )
@@ -553,8 +550,6 @@ def objective_function(
     mass_residual: Float[Array, " elements"] = (
         safe_exp(log_element_moles_total - log_target_moles) - 1
     )
-    # Log-space residual can perform better when close to the solution
-    # mass_residual = log_element_density_total - log_target_density
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
     # jax.debug.print(
     #     "mass_residual min/max: {out}/{out2}",
@@ -571,7 +566,7 @@ def objective_function(
     log_min_number_moles: Float[Array, " species"] = get_min_log_elemental_abundance_per_species(
         parameters
     ) + jnp.log(parameters.solver_parameters.tau)
-    # jax.debug.print("log_min_number_density = {out}", out=log_min_number_density)
+    # jax.debug.print("log_min_number_moles = {out}", out=log_min_number_moles)
     # Dimensionless (log-ratio)
     stability_residual: Float[Array, " species"] = (
         log_number_moles + log_stability - log_min_number_moles

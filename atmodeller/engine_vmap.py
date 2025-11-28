@@ -44,7 +44,7 @@ from atmodeller.engine import (
     get_total_pressure,
     objective_function,
 )
-from atmodeller.solvers import LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec
+from atmodeller.solvers import LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec
 
 
 @dataclass
@@ -91,22 +91,22 @@ class VmappedFunctions:
         # Pre-build vmap wrappers
         self._get_atmosphere_log_molar_mass = eqx.filter_vmap(
             get_atmosphere_log_molar_mass,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
         )
 
         self._get_element_moles = eqx.filter_vmap(
             get_element_moles,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
         )
 
         self._get_element_moles_in_melt = eqx.filter_vmap(
             get_element_moles_in_melt,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
         )
 
         self._get_log_activity = eqx.filter_vmap(
             get_log_activity,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
         )
 
         self._get_reactions_only_mask = eqx.filter_vmap(
@@ -116,22 +116,22 @@ class VmappedFunctions:
 
         self._get_species_moles_in_melt = eqx.filter_vmap(
             get_species_moles_in_melt,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
         )
 
         self._get_species_ppmw_in_melt = eqx.filter_vmap(
             get_species_ppmw_in_melt,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
         )
 
         self._get_total_pressure = eqx.filter_vmap(
             get_total_pressure,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
         )
 
         self._objective_function_vmap = eqx.filter_vmap(
             objective_function,
-            in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, parameters_vmap_axes),
+            in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, parameters_vmap_axes),
         )
 
     def get_atmosphere_log_molar_mass(self, log_number_density: Array) -> Array:
