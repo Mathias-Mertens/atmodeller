@@ -55,7 +55,7 @@ class VmappedFunctions:
     masks, etc.) with :func:`equinox.filter_vmap` so they can be evaluated efficiently over batched
     inputs.
 
-    The primary assumption is that ``log_number_density`` inputs are already batched along axis 0.
+    The primary assumption is that ``log_number_moles`` inputs are already batched along axis 0.
     The ``in_axes`` specifications for all ``vmap`` calls are precomputed at initialisation from
     the provided ``parameters`` object, ensuring consistent vectorisation behavior across all
     functions.
@@ -134,29 +134,29 @@ class VmappedFunctions:
             in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, parameters_vmap_axes),
         )
 
-    def get_atmosphere_log_molar_mass(self, log_number_density: Array) -> Array:
-        return self._get_atmosphere_log_molar_mass(self.parameters, log_number_density)
+    def get_atmosphere_log_molar_mass(self, log_number_moles: Array) -> Array:
+        return self._get_atmosphere_log_molar_mass(self.parameters, log_number_moles)
 
-    def get_element_moles(self, log_number_density: Array) -> Array:
-        return self._get_element_moles(self.parameters, log_number_density)
+    def get_element_moles(self, log_number_moles: Array) -> Array:
+        return self._get_element_moles(self.parameters, log_number_moles)
 
-    def get_element_moles_in_melt(self, log_number_density: Array) -> Array:
-        return self._get_element_moles_in_melt(self.parameters, log_number_density)
+    def get_element_moles_in_melt(self, log_number_moles: Array) -> Array:
+        return self._get_element_moles_in_melt(self.parameters, log_number_moles)
 
-    def get_log_activity(self, log_number_density: Array) -> Array:
-        return self._get_log_activity(self.parameters, log_number_density)
+    def get_log_activity(self, log_number_moles: Array) -> Array:
+        return self._get_log_activity(self.parameters, log_number_moles)
 
     def get_reactions_only_mask(self) -> Array:
         return self._get_reactions_only_mask(self.parameters)
 
-    def get_species_moles_in_melt(self, log_number_density: Array) -> Array:
-        return self._get_species_moles_in_melt(self.parameters, log_number_density)
+    def get_species_moles_in_melt(self, log_number_moles: Array) -> Array:
+        return self._get_species_moles_in_melt(self.parameters, log_number_moles)
 
-    def get_species_ppmw_in_melt(self, log_number_density: Array) -> Array:
-        return self._get_species_ppmw_in_melt(self.parameters, log_number_density)
+    def get_species_ppmw_in_melt(self, log_number_moles: Array) -> Array:
+        return self._get_species_ppmw_in_melt(self.parameters, log_number_moles)
 
-    def get_total_pressure(self, log_number_density: Array) -> Array:
-        return self._get_total_pressure(self.parameters, log_number_density)
+    def get_total_pressure(self, log_number_moles: Array) -> Array:
+        return self._get_total_pressure(self.parameters, log_number_moles)
 
     def objective_function(self, solution: Array) -> Array:
         return self._objective_function_vmap(solution, self.parameters)

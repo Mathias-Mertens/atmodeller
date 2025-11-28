@@ -67,7 +67,7 @@ class InteriorAtmosphere:
 
         return self._output
 
-    def calculate_disequilibrium(self, *, planet: Planet, log_number_density: ArrayLike) -> None:
+    def calculate_disequilibrium(self, *, planet: Planet, log_number_moles: ArrayLike) -> None:
         """Computes the Gibbs free energy disequilibrium.
 
         This method calculates the Gibbs free energy difference (ΔG) for each considered reaction
@@ -77,11 +77,11 @@ class InteriorAtmosphere:
 
         Args:
             planet: Planet
-            log_number_density: Log number density
+            log_number_moles: Log number of moles
         """
         parameters: Parameters = Parameters.create(self.species, planet)
         solution_array: Array = broadcast_initial_solution(
-            log_number_density, None, self.species.number_species, parameters.batch_size
+            log_number_moles, None, self.species.number_species, parameters.batch_size
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
 
@@ -90,7 +90,7 @@ class InteriorAtmosphere:
     def solve(
         self,
         *,
-        initial_log_number_density: Optional[ArrayLike] = None,
+        initial_log_number_moles: Optional[ArrayLike] = None,
         initial_log_stability: Optional[ArrayLike] = None,
         planet: Optional[Planet] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
@@ -113,7 +113,7 @@ class InteriorAtmosphere:
         fast and will reuse cached compilation artifacts.
 
         Args:
-            initial_log_number_density: Initial log number density. Defaults to ``None``.
+            initial_log_number_moles: Initial log number of moles. Defaults to ``None``.
             initial_log_stability: Initial log stability. Defaults to ``None``.
             planet: Planet. Defaults to ``None``.
             fugacity_constraints: Fugacity constraints. Defaults to ``None``.
@@ -133,7 +133,7 @@ class InteriorAtmosphere:
             solver_parameters,
         )
         base_solution_array: Array = broadcast_initial_solution(
-            initial_log_number_density,
+            initial_log_number_moles,
             initial_log_stability,
             self.species.number_species,
             parameters.batch_size,
@@ -244,7 +244,7 @@ def _broadcast_component(
 
 
 def broadcast_initial_solution(
-    initial_log_number_density: Optional[ArrayLike],
+    initial_log_number_moles: Optional[ArrayLike],
     initial_log_stability: Optional[ArrayLike],
     number_of_species: int,
     batch_size: int,
@@ -254,7 +254,7 @@ def broadcast_initial_solution(
     ``D = number_of_species + number_of_stability``, i.e. the total number of solution quantities
 
     Args:
-        initial_log_number_density: Initial log number density or ``None``
+        initial_log_number_moles: Initial log number moles or ``None``
         initial_log_stability: Initial log stability or ``None``
         number_of_species: Number of species
         batch_size: Batch size
@@ -262,12 +262,12 @@ def broadcast_initial_solution(
     Returns:
         Initial solution with shape ``(batch_size, solution)``
     """
-    number_density: NpFloat = _broadcast_component(
-        initial_log_number_density,
+    number_moles: NpFloat = _broadcast_component(
+        initial_log_number_moles,
         INITIAL_LOG_NUMBER_MOLES,
         number_of_species,
         batch_size,
-        name="initial_log_number_density",
+        name="initial_log_number_moles",
     )
     stability: NpFloat = _broadcast_component(
         initial_log_stability,
@@ -277,4 +277,4 @@ def broadcast_initial_solution(
         name="initial_log_stability",
     )
 
-    return jnp.concatenate((number_density, stability), axis=-1)
+    return jnp.concatenate((number_moles, stability), axis=-1)

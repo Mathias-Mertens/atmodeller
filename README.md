@@ -72,12 +72,12 @@ mass_constraints = {
 }
 
 # If you do not specify an initial solution guess then a default will be used
-# Initial solution guess number density (molecules/m^3)
-initial_log_number_density = 50
+# Initial solution guess number moles
+initial_log_number_moles = 50
 
 interior_atmosphere.solve(
     planet=planet,
-    initial_log_number_density=initial_log_number_density,
+    initial_log_number_moles=initial_log_number_moles,
     mass_constraints=mass_constraints,
 )
 output = interior_atmosphere.output
