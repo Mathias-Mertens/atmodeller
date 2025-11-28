@@ -872,13 +872,13 @@ class SolverParameters(RootFindParameters):
         )
 
     def _get_hypercube_bound(
-        self, number_species: int, log_number_density_bound: float, stability_bound: float
+        self, number_species: int, log_number_moles_bound: float, stability_bound: float
     ) -> Float[Array, " dim"]:
         """Gets the bound on the hypercube.
 
         Args:
             number_species: Number of species
-            log_number_density_bound: Bound on the log number density
+            log_number_moles_bound: Bound on the log number of moles
             stability_bound: Bound on the stability
 
         Returns:
@@ -886,7 +886,7 @@ class SolverParameters(RootFindParameters):
         """
         bound: Array = jnp.concatenate(
             (
-                log_number_density_bound * jnp.ones(number_species),
+                log_number_moles_bound * jnp.ones(number_species),
                 stability_bound * jnp.ones(number_species),
             )
         )
