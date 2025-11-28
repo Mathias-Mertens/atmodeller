@@ -18,29 +18,23 @@ All gas species
    * - Name
      - Units
      - Description
-   * - atmosphere_mass
+   * - gas_mass
      - kg
-     - Mass in the atmosphere
-   * - atmosphere_moles
-     - moles
-     - Number of moles in the atmosphere
-   * - atmosphere_number
-     - molecules
-     - Number of molecules in the atmosphere
-   * - atmosphere_number_density
-     - molecules m\ :math:`^{-3}`
-     - Number density in the atmosphere
+     - Mass in the gas
+   * - gas_number
+     - mol
+     - Number of moles in the gas
+   * - gas_number_density
+     - mol m\ :math:`^{-3}`
+     - Number density in the gas
    * - dissolved_mass
      - kg
      - Mass dissolved in the melt
-   * - dissolved_moles
-     - moles
-     - Number of moles in the melt
    * - dissolved_number
-     - molecules
-     - Number of molecules in the melt
+     - mol
+     - Number of moles in the melt
    * - dissolved_number_density
-     - molecules m\ :math:`^{-3}`
+     - mol m\ :math:`^{-3}`
      - Number density in the melt
    * - dissolved_ppmw
      - kg kg\ :math:`^{-1}` (ppm by weight)
@@ -52,7 +46,7 @@ All gas species
      - dimensionless
      - Fugacity relative to (partial) pressure
    * - molar_mass
-     - kg mole\ :math:`^{-1}`
+     - kg mol\ :math:`^{-1}`
      - Molar mass
    * - pressure
      - bar
@@ -60,18 +54,18 @@ All gas species
    * - total_mass
      - kg
      - Mass in all reservoirs
-   * - total_moles
-     - moles
-     - Number of moles in all reservoirs
    * - total_number
-     - molecules
-     - Number of molecules in all reservoirs
+     - mol
+     - Number of moles in all reservoirs
    * - total_number_density
-     - molecules m\ :math:`^{-3}`
+     - mol m\ :math:`^{-3}`
      - Number density in all reservoirs
    * - volume_mixing_ratio
-     - dimensionless
-     - Volume mixing ratio (atmosphere)
+     - mol mol\ :math:`^{-1}`
+     - Volume mixing ratio (gas)
+   * - gas_mass_fraction
+     - kg kg\ :math:`^{-1}`
+     - Mass fraction in the gas phase
 
 O2_g additional outputs
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -106,19 +100,16 @@ Species output have a dictionary key associated with the species name and its st
      - dimensionless
      - Activity
    * - molar_mass
-     - kg mole\ :math:`^{-1}`
+     - kg mol\ :math:`^{-1}`
      - Molar mass
    * - total_mass
      - kg
      - Mass
-   * - total_moles
-     - moles
-     - Number of moles
    * - total_number
-     - molecules
-     - Number of molecules
+     - mol
+     - Number of moles
    * - total_number_density
-     - molecules m\ :math:`^{-3}`
+     - mol m\ :math:`^{-3}`
      - Number density
 
 Elements
@@ -133,29 +124,23 @@ Element outputs have a dictionary key associated with the element name with an `
    * - Name
      - Units
      - Description
-   * - atmosphere_mass
+   * - gas_mass
      - kg
-     - Mass in the atmosphere
-   * - atmosphere_moles
-     - moles
-     - Number of moles in the atmosphere
-   * - atmosphere_number
-     - atoms
-     - Number of atoms in the atmosphere
-   * - atmosphere_number_density
-     - atoms m\ :math:`^{-3}`
-     - Number density in the atmosphere
+     - Mass in the gas
+   * - gas_number
+     - mol
+     - Number of moles in the gas
+   * - gas_number_density
+     - mol m\ :math:`^{-3}`
+     - Number density in the gas
    * - condensed_mass
      - kg
      - Mass in condensed species
-   * - condensed_moles
-     - moles
-     - Number of moles in condensed species
    * - condensed_number
-     - atoms
-     - Number of atoms in condensed species
+     - mol
+     - Number of moles in condensed species
    * - condensed_number_density
-     - atoms m\ :math:`^{-3}`
+     - mol m\ :math:`^{-3}`
      - Number density in condensed species
    * - degree_of_condensation
      - dimensionless
@@ -163,36 +148,30 @@ Element outputs have a dictionary key associated with the element name with an `
    * - dissolved_mass
      - kg
      - Mass dissolved in the melt
-   * - dissolved_moles
-     - moles
-     - Number of moles in the melt
    * - dissolved_number
-     - atoms
-     - Number of atoms in the melt
+     - mol
+     - Number of moles in the melt
    * - dissolved_number_density
-     - atoms m\ :math:`^{-3}`
+     - mol m\ :math:`^{-3}`
      - Number density in the melt
    * - logarithmic_abundance
      - dimensionless
      - Logarithmic abundance
    * - molar_mass
-     - kg mole\ :math:`^{-1}`
+     - kg mol\ :math:`^{-1}`
      - Molar mass
    * - total_mass
      - kg
      - Mass in all reservoirs
-   * - total_moles
-     - moles
-     - Number of moles in all reservoirs
    * - total_number
-     - atoms
-     - Number of atoms in all reservoirs
+     - mol
+     - Number of moles in all reservoirs
    * - total_number_density
-     - atoms m\ :math:`^{-3}`
+     - mol m\ :math:`^{-3}`
      - Number density in all reservoirs
    * - volume_mixing_ratio
-     - dimensionless
-     - Volume mixing ratio (atmosphere)
+     - mol mol\ :math:`^{-1}`
+     - Volume mixing ratio (gas)
 
 Planet
 ------
@@ -237,56 +216,50 @@ The planet output has a dictionary key of `planet`.
      - K
      - Temperature at the planetary surface
 
-Atmosphere
-----------
+Gas phase (totals)
+------------------
 
-The atmosphere output has a dictionary key of `atmosphere`.
+The gas phase output has a dictionary key of `gas`.
 
-.. list-table:: Outputs for atmosphere
+.. list-table:: Outputs for gas
    :widths: 25 25 50
    :header-rows: 1
 
    * - Name
      - Units
      - Description
-   * - species_moles
-     - moles
-     - Number of moles of species
    * - species_number
-     - molecules
-     - Number of molecules of species
+     - mol
+     - Number of moles of species
    * - species_number_density
-     - molecules m\ :math:`^{-3}`
+     - mol m\ :math:`^{-3}`
      - Number density of species
    * - mass
      - kg
      - Mass
    * - molar_mass
-     - kg mole\ :math:`^{-1}`
+     - kg mol\ :math:`^{-1}`
      - Molar mass
    * - pressure
      - bar
-     - Total pressure of the atmosphere
+     - Total pressure of the gas
    * - volume
      - m\ :math:`^{3}`
-     - Volume of the atmosphere
-   * - element_moles
-     - moles
-     - Number of moles of elements
+     - Volume of the gas
    * - element_number
-     - atoms
-     - Number of atoms of elements
+     - mol
+     - Number of moles of elements
    * - element_number_density
-     - atoms m\ :math:`^{-3}`
+     - mol m\ :math:`^{-3}`
      - Number density of elements
    * - temperature
      - K
-     - Temperature of the atmosphere
+     - Temperature of the gas
   
 Other output
 ------------
 
 - constraints: Applied elemental mass and/or species fugacity constraints
-- raw: Raw solution from the solver, i.e. number densities and stabilities
+- raw: Raw solution from the solver, i.e. number of moles and stabilities
 - residual: Residuals of the reaction network and mass balance
 - solver: Solver quantities

@@ -308,8 +308,9 @@ class Output:
         out["volume_mixing_ratio"] = out["gas_number"] / np.sum(
             out["gas_number"], axis=1, keepdims=True
         )
-        out["gas_ppm"] = out["volume_mixing_ratio"] * mega
-        out["gas_ppmw"] = out["gas_mass"] / np.sum(out["gas_mass"], axis=1, keepdims=True) * mega
+        out["gas_mass_fraction"] = (
+            out["gas_mass"] / np.sum(out["gas_mass"], axis=1, keepdims=True) * mega
+        )
 
         unique_elements: tuple[str, ...] = self.species.unique_elements
         if "H" in unique_elements:
