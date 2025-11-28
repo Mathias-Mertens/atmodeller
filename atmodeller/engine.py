@@ -40,7 +40,6 @@ import equinox as eqx
 import jax.numpy as jnp
 from jax import lax
 from jax.scipy.special import logsumexp
-from jaxmod.constants import BOLTZMANN_CONSTANT_BAR
 from jaxmod.units import unit_conversion
 from jaxmod.utils import safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, Shaped
@@ -263,28 +262,6 @@ def get_log_Kp(parameters: Parameters) -> Float[Array, " reactions"]:
     log_Kp: Float[Array, "reactions 1"] = -1.0 * reaction_matrix @ gibbs_values
 
     return jnp.ravel(log_Kp)
-
-
-# TODO: remove?
-def get_log_pressure_from_log_number_density(
-    parameters: Parameters, log_number_density: Float[Array, " species"]
-) -> Float[Array, " species"]:
-    """Gets log pressure from log number density.
-
-    Args:
-        parameters: Parameters
-        log_number_density: Log number density
-
-    Returns:
-        Log pressure
-    """
-    log_pressure: Float[Array, " species"] = (
-        jnp.log(BOLTZMANN_CONSTANT_BAR)
-        + jnp.log(parameters.planet.temperature)
-        + log_number_density
-    )
-
-    return log_pressure
 
 
 def get_min_log_elemental_abundance_per_species(

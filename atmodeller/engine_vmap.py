@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import equinox as eqx
-from jaxtyping import Array, ArrayLike
+from jaxtyping import Array
 
 from atmodeller.containers import Parameters
 from atmodeller.engine import (
@@ -45,7 +45,6 @@ from atmodeller.engine import (
     objective_function,
 )
 from atmodeller.solvers import LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec
-from atmodeller.utilities import get_log_number_density_from_log_pressure
 
 
 @dataclass
@@ -76,7 +75,6 @@ class VmappedFunctions:
     _get_element_moles: Callable
     _get_element_moles_in_melt: Callable
     _get_log_activity: Callable
-    _get_log_number_density_from_log_pressure: Callable
     _get_reactions_only_mask: Callable
     _get_species_moles_in_melt: Callable
     _get_species_ppmw_in_melt: Callable
@@ -109,11 +107,6 @@ class VmappedFunctions:
         self._get_log_activity = eqx.filter_vmap(
             get_log_activity,
             in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
-        )
-
-        self._get_log_number_density_from_log_pressure = eqx.filter_vmap(
-            get_log_number_density_from_log_pressure,
-            in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, temperature_vmap_axes),
         )
 
         self._get_reactions_only_mask = eqx.filter_vmap(
@@ -152,11 +145,6 @@ class VmappedFunctions:
 
     def get_log_activity(self, log_number_density: Array) -> Array:
         return self._get_log_activity(self.parameters, log_number_density)
-
-    def get_log_number_density_from_log_pressure(
-        self, log_pressure: ArrayLike, temperature: ArrayLike
-    ) -> Array:
-        return self._get_log_number_density_from_log_pressure(log_pressure, temperature)
 
     def get_reactions_only_mask(self) -> Array:
         return self._get_reactions_only_mask(self.parameters)
