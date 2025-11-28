@@ -100,9 +100,9 @@ class Output:
         return self.parameters.species
 
     @property
-    def temperature(self) -> NpFloat:  # 1-D
+    def temperature(self) -> NpFloat:  # Must return 1-D for shape consistency
         """Temperature"""
-        return np.asarray(self.planet.temperature)
+        return np.atleast_1d(self.planet.temperature)
 
     def activity(self) -> NpFloat:  # 2-D
         """Gets the activity of all species.
@@ -513,7 +513,7 @@ class Output:
         pressure: NpFloat = (
             self.number_moles
             * GAS_CONSTANT_BAR
-            * self.temperature
+            * self.temperature[:, np.newaxis]
             / self.gas_volume()[:, np.newaxis]
         )
 
