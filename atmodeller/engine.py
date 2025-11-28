@@ -144,7 +144,7 @@ def get_element_moles_in_melt(
     formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
         parameters.species.formula_matrix
     )
-    element_melt_moles: Float[Array, " species"] = formula_matrix.dot(species_melt_moles)
+    element_melt_moles: Float[Array, " species"] = formula_matrix @ species_melt_moles
 
     return element_melt_moles
 
@@ -168,6 +168,36 @@ def get_gas_species_data(
     return gas_data
 
 
+def get_log_mole_fraction_in_gas(
+    parameters: Parameters, log_number_moles: Float[Array, " species"]
+) -> Float[Array, " species"]:
+    """Gets the log mole fraction of the species in the gas phase
+
+    Args:
+        parameters: Parameters
+        log_number_moles: Log number of moles
+
+    Returns:
+        Log mole fraction in the gas
+    """
+    gas_species_mask: Bool[Array, " species"] = jnp.array(parameters.species.gas_species_mask)
+
+    # Represent mask in log space: True -> 0, False -> -inf
+    log_mask: Float[Array, " species"] = jnp.where(gas_species_mask, 0.0, -jnp.inf)
+
+    # Masked log number of moles
+    log_gas_number_moles: Float[Array, " species"] = log_number_moles + log_mask
+
+    # Log total (sum in linear space)
+    total_log_number_moles: Float[Array, ""] = logsumexp(log_gas_number_moles)
+
+    # Log mole fraction = log(n_i) − log(total)
+    log_mole_fraction: Float[Array, " species"] = log_gas_number_moles - total_log_number_moles
+    # jax.debug.print("log_mole_fraction = {out}", out=log_mole_fraction)
+
+    return log_mole_fraction
+
+
 def get_log_activity(
     parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, " species"]:
@@ -181,16 +211,17 @@ def get_log_activity(
         Log activity
     """
     gas_species_mask: Bool[Array, " species"] = jnp.array(parameters.species.gas_species_mask)
-    number_moles: Float[Array, " species"] = safe_exp(log_number_moles)
-    gas_species_number_moles: Float[Array, " species"] = gas_species_mask * number_moles
-    atmosphere_log_number_moles: Float[Array, ""] = jnp.log(jnp.sum(gas_species_number_moles))
+
+    log_mole_fraction: Float[Array, " species"] = get_log_mole_fraction_in_gas(
+        parameters, log_number_moles
+    )
 
     log_activity_pure_species: Float[Array, " species"] = get_log_activity_pure_species(
         parameters, log_number_moles
     )
     # jax.debug.print("log_activity_pure_species = {out}", out=log_activity_pure_species)
     log_activity_gas_species: Float[Array, " species"] = (
-        log_activity_pure_species + log_number_moles - atmosphere_log_number_moles
+        log_activity_pure_species + log_mole_fraction
     )
     # jax.debug.print("log_activity_gas_species = {out}", out=log_activity_gas_species)
     log_activity: Float[Array, " species"] = jnp.where(
@@ -585,12 +616,7 @@ def objective_function(
 
     # NOTE: Order must be identical to get_active_mask()
     residual: Float[Array, " residual"] = jnp.concatenate(
-        [
-            fugacity_residual,
-            reaction_residual,
-            mass_residual,
-            stability_residual,
-        ]
+        [fugacity_residual, reaction_residual, mass_residual, stability_residual]
     )
     # jax.debug.print("residual (with nans) = {out}", out=residual)
 
