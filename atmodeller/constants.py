@@ -16,10 +16,7 @@
 #
 """Physical and numerical constants
 
-This module defines reference thermodynamic conditions, numerical limits, solver parameters, and
-key physical constants (e.g., Avogadro number, Boltzmann constant). These constants are used
-throughout the codebase to ensure consistency with standard conventions (JANAF tables, IUPAC
-values) and to provide empirically tested defaults for numerical solvers.
+This module defines reference thermodynamic conditions and numerical limits.
 """
 
 import numpy as np

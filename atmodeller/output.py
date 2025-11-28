@@ -191,7 +191,7 @@ class OutputSolution(Output):
 
         # Temperature and pressure have already been expanded to the number of solutions
         temperature: NpFloat = out["planet"]["surface_temperature"]
-        pressure: NpFloat = out["atmosphere"]["pressure"]
+        pressure: NpFloat = out["gas"]["pressure"]
 
         out["constraints"] = {}
         out["constraints"] |= broadcast_arrays_in_dict(
