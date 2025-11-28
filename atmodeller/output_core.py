@@ -145,12 +145,12 @@ class Output:
         out |= self.elements_asdict()
 
         out["planet"] = broadcast_arrays_in_dict(self.planet.asdict(), self.number_solutions)
-        out["atmosphere"] = self.atmosphere_asdict()
+        out["gas"] = self.gas_asdict()
         # Temperature and pressure have already been expanded to the number of solutions
         temperature: NpFloat = out["planet"]["surface_temperature"]
-        pressure: NpFloat = out["atmosphere"]["pressure"]
-        # Convenient to also attach temperature to the atmosphere output
-        out["atmosphere"]["temperature"] = temperature
+        pressure: NpFloat = out["gas"]["pressure"]
+        # Convenient to also attach temperature to the gas output
+        out["gas"]["temperature"] = temperature
         out["raw"] = self.raw_solution_asdict()
 
         if "O2_g" in out:
@@ -185,11 +185,11 @@ class Output:
 
         return out
 
-    def atmosphere_asdict(self) -> dict[str, NpArray]:
-        """Gets the atmosphere properties.
+    def gas_asdict(self) -> dict[str, NpArray]:
+        """Gets the gas properties.
 
         Returns:
-            Atmosphere properties
+            Gas properties
         """
         out: dict[str, NpArray] = {}
 
@@ -198,7 +198,7 @@ class Output:
         )
         # Must be 2-D to align arrays for computing number-density-related quantities
         number_density: NpArray = np.exp(log_number_density)[:, np.newaxis]
-        molar_mass: NpArray = self.atmosphere_molar_mass()[:, np.newaxis]
+        molar_mass: NpArray = self.gas_molar_mass()[:, np.newaxis]
         out: dict[str, NpArray] = self._get_number_density_output(
             number_density, molar_mass, "species_"
         )
@@ -210,40 +210,40 @@ class Output:
         out = {key: value.ravel() for key, value in out.items()}
 
         out["pressure"] = self.total_pressure()
-        out["volume"] = self.atmosphere_volume()
+        out["volume"] = self.gas_volume()
         out["element_number_density"] = np.sum(self.element_density_gas(), axis=1)
         out["element_number"] = out["element_number_density"] * out["volume"]
         out["element_moles"] = out["element_number"] / AVOGADRO
 
         return out
 
-    def atmosphere_log_molar_mass(self) -> NpFloat:
-        """Gets log molar mass of the atmosphere.
+    def gas_log_molar_mass(self) -> NpFloat:
+        """Gets log molar mass of the gas.
 
         Returns:
-            Log molar mass of the atmosphere
+            Log molar mass of the gas
         """
-        atmosphere_log_molar_mass: Array = self.vmapf.get_atmosphere_log_molar_mass(
+        gas_log_molar_mass: Array = self.vmapf.get_atmosphere_log_molar_mass(
             jnp.asarray(self.log_number_moles)
         )
 
-        return np.asarray(atmosphere_log_molar_mass)
+        return np.asarray(gas_log_molar_mass)
 
-    def atmosphere_molar_mass(self) -> NpArray:
-        """Gets the molar mass of the atmosphere.
-
-        Returns:
-            Molar mass of the atmosphere
-        """
-        return np.exp(self.atmosphere_log_molar_mass())
-
-    def atmosphere_volume(self) -> NpFloat:
-        """Gets the volume of the atmosphere.
+    def gas_molar_mass(self) -> NpArray:
+        """Gets the molar mass of the gas.
 
         Returns:
-            Volume of the atmosphere
+            Molar mass of the gas
         """
-        # Total number of moles in the atmosphere
+        return np.exp(self.gas_log_molar_mass())
+
+    def gas_volume(self) -> NpFloat:
+        """Gets the volume of the gas.
+
+        Returns:
+            Volume of the gas
+        """
+        # Total number of moles in the gas
         n: NpFloat = np.sum(self.number_moles[:, self.gas_species_mask], axis=1)
         volume: NpFloat = (n * GAS_CONSTANT_BAR * self.temperature) / self.total_pressure()
 
@@ -298,27 +298,23 @@ class Output:
             Element outputs as a dictionary
         """
         molar_mass: NpArray = self.element_molar_mass_expanded()
-        atmosphere: NpArray = self.element_density_gas()
+        gas: NpArray = self.element_density_gas()
         condensed: NpArray = self.element_density_condensed()
         dissolved: NpArray = self.element_density_dissolved()
-        total: NpArray = atmosphere + condensed + dissolved
+        total: NpArray = gas + condensed + dissolved
 
-        out: dict[str, NpArray] = self._get_number_density_output(
-            atmosphere, molar_mass, "atmosphere_"
-        )
+        out: dict[str, NpArray] = self._get_number_density_output(gas, molar_mass, "gas_")
         out |= self._get_number_density_output(condensed, molar_mass, "condensed_")
         out |= self._get_number_density_output(dissolved, molar_mass, "dissolved_")
         out |= self._get_number_density_output(total, molar_mass, "total_")
 
         out["molar_mass"] = molar_mass
         out["degree_of_condensation"] = out["condensed_number"] / out["total_number"]
-        out["volume_mixing_ratio"] = out["atmosphere_number"] / np.sum(
-            out["atmosphere_number"], axis=1, keepdims=True
+        out["volume_mixing_ratio"] = out["gas_number"] / np.sum(
+            out["gas_number"], axis=1, keepdims=True
         )
-        out["atmosphere_ppm"] = out["volume_mixing_ratio"] * mega
-        out["atmosphere_ppmw"] = (
-            out["atmosphere_mass"] / np.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
-        )
+        out["gas_ppm"] = out["volume_mixing_ratio"] * mega
+        out["gas_ppmw"] = out["gas_mass"] / np.sum(out["gas_mass"], axis=1, keepdims=True) * mega
 
         unique_elements: tuple[str, ...] = self.species.unique_elements
         if "H" in unique_elements:
@@ -350,7 +346,7 @@ class Output:
         element_moles: Array = self.vmapf.get_element_moles(
             jnp.asarray(self.log_number_moles) * condensed_species_mask
         )
-        element_density = element_moles * AVOGADRO / self.atmosphere_volume()
+        element_density = element_moles * AVOGADRO / self.gas_volume()
 
         return np.asarray(element_density)
 
@@ -363,7 +359,7 @@ class Output:
         element_moles_dissolved: Array = self.vmapf.get_element_moles_in_melt(
             jnp.asarray(self.log_number_moles)
         )
-        element_density = element_moles_dissolved * AVOGADRO / self.atmosphere_volume()
+        element_density = element_moles_dissolved * AVOGADRO / self.gas_volume()
 
         return np.asarray(element_density)
 
@@ -377,7 +373,7 @@ class Output:
         element_moles: Array = self.vmapf.get_element_moles(
             jnp.asarray(self.log_number_moles) * gas_species_mask,
         )
-        element_density = element_moles * AVOGADRO / self.atmosphere_volume()
+        element_density = element_moles * AVOGADRO / self.gas_volume()
 
         return np.asarray(element_density)
 
@@ -409,7 +405,7 @@ class Output:
             Dictionary of output quantities
         """
         # Volume must be a column vector because it multiples all elements in the row
-        number: NpArray = number_density * self.atmosphere_volume()[:, np.newaxis]
+        number: NpArray = number_density * self.gas_volume()[:, np.newaxis]
         moles: NpArray = number / AVOGADRO
         mass: NpArray = moles * molar_mass_expanded
 
@@ -450,17 +446,15 @@ class Output:
         gas_species: tuple[str, ...] = self.species.gas_species_names
 
         out: dict[str, NpArray] = {}
-        out |= self._get_number_density_output(number_density, molar_mass, "atmosphere_")
+        out |= self._get_number_density_output(number_density, molar_mass, "gas_")
         out |= self._get_number_density_output(dissolved_number_density, molar_mass, "dissolved_")
         out |= self._get_number_density_output(total_number_density, molar_mass, "total_")
         out["molar_mass"] = molar_mass
-        out["volume_mixing_ratio"] = out["atmosphere_number"] / np.sum(
-            out["atmosphere_number"], axis=1, keepdims=True
+        out["volume_mixing_ratio"] = out["gas_number"] / np.sum(
+            out["gas_number"], axis=1, keepdims=True
         )
-        out["atmosphere_ppm"] = out["volume_mixing_ratio"] * mega
-        out["atmosphere_ppmw"] = (
-            out["atmosphere_mass"] / np.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
-        )
+        out["gas_ppm"] = out["volume_mixing_ratio"] * mega
+        out["gas_ppmw"] = out["gas_mass"] / np.sum(out["gas_mass"], axis=1, keepdims=True) * mega
         out["pressure"] = pressure
         out["fugacity"] = activity
         out["fugacity_coefficient"] = activity / pressure
@@ -514,7 +508,7 @@ class Output:
         Returns:
             Number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
         """
-        return np.exp(self.log_number_moles) * AVOGADRO / self.atmosphere_volume()[:, np.newaxis]
+        return np.exp(self.log_number_moles) * AVOGADRO / self.gas_volume()[:, np.newaxis]
 
     def reaction_mask(self) -> NpBool:
         """Gets the reaction mask of the residual array.
@@ -543,7 +537,7 @@ class Output:
             Pressure of species in bar
         """
         pressure: NpFloat = (
-            self.number_moles * GAS_CONSTANT_BAR * self.temperature / self.atmosphere_volume()
+            self.number_moles * GAS_CONSTANT_BAR * self.temperature / self.gas_volume()
         )
 
         return pressure
@@ -611,7 +605,7 @@ class Output:
         species_moles_in_melt: Array = self.vmapf.get_species_moles_in_melt(
             jnp.asarray(self.log_number_moles)
         )
-        species_density_in_melt = species_moles_in_melt * AVOGADRO / self.atmosphere_volume()
+        species_density_in_melt = species_moles_in_melt * AVOGADRO / self.gas_volume()
 
         return np.asarray(species_density_in_melt)
 
