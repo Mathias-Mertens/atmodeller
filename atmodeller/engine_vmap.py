@@ -27,7 +27,6 @@ handled by the :mod:`~atmodeller.solvers` module.
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
 
 import equinox as eqx
 from jaxtyping import Array
@@ -86,7 +85,6 @@ class VmappedFunctions:
 
         # Compute axes specs once
         parameters_vmap_axes: Parameters = vmap_axes_spec(parameters)
-        temperature_vmap_axes: Literal[0, None] = vmap_axes_spec(parameters.planet.temperature)
 
         # Pre-build vmap wrappers
         self._get_atmosphere_log_molar_mass = eqx.filter_vmap(
