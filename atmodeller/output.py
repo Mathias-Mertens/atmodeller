@@ -204,6 +204,7 @@ class OutputSolution(Output):
         pressure_constraints = broadcast_arrays_in_dict(
             self.parameters.total_pressure_constraint.asdict(), self.number_solutions
         )
+        # Only export the total pressure constraint if it is applied for at least one of the cases.
         if np.any(~np.isnan(pressure_constraints["total_pressure"])):
             out["constraints"] |= pressure_constraints
 
