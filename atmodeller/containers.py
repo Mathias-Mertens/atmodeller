@@ -41,7 +41,12 @@ from atmodeller.constants import (
     TAU,
 )
 from atmodeller.eos.core import IdealGas
-from atmodeller.interfaces import ActivityProtocol, FugacityConstraintProtocol, SolubilityProtocol
+from atmodeller.interfaces import (
+    ActivityProtocol,
+    FugacityConstraintProtocol,
+    SolubilityProtocol,
+    ThermodynamicSystemProtocol,
+)
 from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import (
     CondensateActivity,
@@ -365,8 +370,77 @@ class SpeciesCollection(eqx.Module):
         return str(tuple(str(species) for species in self.data))
 
 
-class Planet(eqx.Module):
+class ThermodynamicSystem(eqx.Module):
+    """A generic thermodynamic system
+
+    This must adhere to ThermodynamicSystemProtocol.
+
+    Note:
+        All parameters are stored as JAX arrays (``jnp.ndarray``) rather than Python floats. This
+        ensures that JAX sees a consistent type during transformations (e.g., ``jit``, ``grad``,
+        ``vmap``), preventing unnecessary recompilation when values change. In JAX, switching
+        between a Python float and an array for the same argument will trigger retracing or
+        recompilation, so keeping everything as arrays avoids this overhead.
+
+    Args:
+        temperature: Temperature in K
+        pressure: Pressure in bar
+        mass: Mass in kg. Defaults to ``1`` kg.
+        melt_fraction: Melt fraction by weight in kg/kg. Defaults to ``1`` kg/kg.
+    """
+
+    temperature: Array = eqx.field(converter=as_j64)
+    """Temperature in K"""
+    pressure: Array = eqx.field(converter=as_j64)
+    """Pressure in bar"""
+    mass: Array = eqx.field(converter=as_j64, default=1)
+    """Mass in kg"""
+    melt_fraction: Array = eqx.field(converter=as_j64, default=1)
+    """Mass fraction of melt in kg/kg"""
+
+    @property
+    def melt_mass(self) -> Array:
+        """Mass of the melt in kg"""
+        return self.mass * self.melt_fraction
+
+    @property
+    def solid_mass(self) -> Array:
+        """Mass of the solid in kg"""
+        return self.mass * (1.0 - self.melt_fraction)
+
+    def get_pressure(self, gas_mass: Array) -> Array:
+        """Gets the pressure.
+
+        Args:
+            gas_mass: Gas mass in kg. Unused but required by the interface.
+
+        Returns:
+            Pressure in bar
+        """
+        del gas_mass
+
+        return self.pressure
+
+    def asdict(self) -> dict[str, NpArray]:
+        """Gets a dictionary of the values as NumPy arrays.
+
+        Returns:
+            A dictionary of the values
+        """
+        base_dict: dict[str, ArrayLike] = asdict(self)
+        base_dict["melt_mass"] = self.melt_mass
+        base_dict["solid_mass"] = self.solid_mass
+
+        # Convert all values to NumPy arrays
+        base_dict_np: dict[str, NpArray] = {k: np.asarray(v) for k, v in base_dict.items()}
+
+        return base_dict_np
+
+
+class PlanetWithThinAtmosphere(eqx.Module):
     """Planet properties
+
+    This must adhere to ThermodynamicSystemProtocol.
 
     Default values are for a fully molten Earth.
 
@@ -383,19 +457,39 @@ class Planet(eqx.Module):
             to ``0.3`` kg/kg (Earth).
         mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to ``1.0`` kg/kg.
         surface_radius: Radius of the planetary surface in m. Defaults to ``6371000`` m (Earth).
-        surface_temperature: Temperature of the planetary surface. Defaults to ``2000`` K.
+        temperature: Temperature in K. Defaults to ``2000`` K.
+        pressure: Pressure in bar. Defaults to ``np.nan`` to solve for the mechanical pressure
+            balance at the surface.
     """
 
-    planet_mass: Array = eqx.field(converter=as_j64, default=5.972e24)
+    planet_mass: Array
     """Mass of the planet in kg"""
-    core_mass_fraction: Array = eqx.field(converter=as_j64, default=0.295334691460966)
+    core_mass_fraction: Array
     """Mass fraction of the core relative to the planetary mass in kg/kg"""
-    mantle_melt_fraction: Array = eqx.field(converter=as_j64, default=1.0)
+    mantle_melt_fraction: Array
     """Mass fraction of the molten mantle in kg/kg"""
-    surface_radius: Array = eqx.field(converter=as_j64, default=6371000)
+    surface_radius: Array
     """Radius of the surface in m"""
-    surface_temperature: Array = eqx.field(converter=as_j64, default=2000)
-    """Temperature of the surface in K"""
+    temperature: Array
+    """Temperature in K"""
+    pressure: Array
+    """Pressure in bar"""
+
+    def __init__(
+        self,
+        planet_mass: ArrayLike = 5.972e24,
+        core_mass_fraction: ArrayLike = 0.295334691460966,
+        mantle_melt_fraction: ArrayLike = 1.0,
+        surface_radius: ArrayLike = 6371000,
+        temperature: ArrayLike = 2000,
+        pressure: ArrayLike = np.nan,
+    ):
+        self.planet_mass = as_j64(planet_mass)
+        self.core_mass_fraction = as_j64(core_mass_fraction)
+        self.mantle_melt_fraction = as_j64(mantle_melt_fraction)
+        self.surface_radius = as_j64(surface_radius)
+        self.temperature = as_j64(temperature)
+        self.pressure = as_j64(pressure)
 
     @property
     def mantle_mass(self) -> Array:
@@ -427,10 +521,50 @@ class Planet(eqx.Module):
         """Surface gravity"""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / jnp.square(self.surface_radius)
 
+    # The following properties are to ensure compliance with ThermodynamicSystemProtocol
     @property
-    def temperature(self) -> Array:
-        """Temperature"""
-        return self.surface_temperature
+    def mass(self) -> Array:
+        return self.mantle_mass
+
+    @property
+    def melt_fraction(self) -> Array:
+        return self.mantle_melt_fraction
+
+    @property
+    def melt_mass(self) -> Array:
+        return self.mantle_melt_mass
+
+    @property
+    def solid_mass(self) -> Array:
+        return self.mantle_solid_mass
+
+    def get_pressure(self, gas_mass: Array) -> Array:
+        """Gets the pressure.
+
+        A pressure is used if specified, otherwise the default behaviour is to compute the
+        pressure from the mechanical pressure balance at the planetary surface assuming the thin
+        atmosphere approximation. That is, the surface gravity is computed from the mass of the
+        planet alone and is assumed to act on all the mass of the atmosphere.
+
+        Args:
+            gas_mass: Gas mass in kg
+
+        Returns:
+            Pressure in bar
+        """
+        pressure_specified: Bool[Array, "..."] = ~jnp.isnan(self.pressure)
+
+        mechanical_pressure: Float[Array, "..."] = (
+            gas_mass * self.surface_gravity / self.surface_area * unit_conversion.Pa_to_bar
+        )
+        # jax.debug.print("mechanical_pressure = {out}", out=mechanical_pressure)
+
+        pressure: Float[Array, ""] = jnp.where(
+            pressure_specified, self.pressure, mechanical_pressure
+        )
+        # jax.debug.print("pressure = {out}", out=pressure)
+
+        return pressure
 
     def asdict(self) -> dict[str, NpArray]:
         """Gets a dictionary of the values as NumPy arrays.
@@ -449,6 +583,10 @@ class Planet(eqx.Module):
         base_dict_np: dict[str, NpArray] = {k: np.asarray(v) for k, v in base_dict.items()}
 
         return base_dict_np
+
+
+# The only planet supported so far is one with a thin atmosphere
+Planet = PlanetWithThinAtmosphere
 
 
 class ConstantFugacityConstraint(eqx.Module):
@@ -598,52 +736,6 @@ class FugacityConstraints(eqx.Module):
         # jax.debug.print("log_fugacity = {out}", out=log_fugacity)
 
         return log_fugacity
-
-
-class TotalPressureConstraint(eqx.Module):
-    """Total pressure constraint
-
-    Args:
-        log_pressure: Log total pressure
-    """
-
-    log_pressure: Float[Array, "..."] = eqx.field(converter=as_j64, default=np.nan)
-
-    @classmethod
-    def create(
-        cls, total_pressure_constraint: Optional[ArrayLike] = None
-    ) -> "TotalPressureConstraint":
-        """Creates an instance
-
-        Args:
-            total_pressure_constraint. Defaults to ``None``.
-
-        Returns:
-            An instance
-        """
-        total_pressure_constraint_: ArrayLike = (
-            total_pressure_constraint if total_pressure_constraint is not None else np.nan
-        )
-
-        return cls(np.log(total_pressure_constraint_))
-
-    def active(self) -> Bool[Array, "..."]:
-        """Active total pressure constraint
-
-        Returns:
-            Mask indicating whether the total pressure constraint is active or not
-        """
-        return ~jnp.isnan(self.log_pressure)
-
-    def asdict(self) -> dict[str, NpArray]:
-        """Gets a dictionary of the total pressure constraint as a NumPy array
-
-        Returns:
-            A dictionary of the total pressure constraint
-        """
-        out: dict[str, NpArray] = {"total_pressure": np.asarray(np.exp(self.log_pressure))}
-
-        return out
 
 
 class MassConstraints(eqx.Module):
@@ -899,24 +991,21 @@ class Parameters(eqx.Module):
 
     Args:
         species: Species
-        planet: Planet
+        thermodynamic_system: Thermodynamic system
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
-        total_pressure_constraint: Total pressure constraint
         solver_parameters: Solver parameters
         batch_size: Batch size. Defaults to ``1``.
     """
 
     species: SpeciesCollection
     """Species"""
-    planet: Planet
-    """Planet"""
+    thermodynamic_system: ThermodynamicSystemProtocol
+    """Thermodynamic system"""
     fugacity_constraints: FugacityConstraints
     """Fugacity constraints"""
     mass_constraints: MassConstraints
     """Mass constraints"""
-    total_pressure_constraint: TotalPressureConstraint
-    """Total pressure constraint"""
     solver_parameters: SolverParameters
     """Solver parameters"""
     batch_size: int = 1
@@ -926,42 +1015,38 @@ class Parameters(eqx.Module):
     def create(
         cls,
         species: SpeciesCollection,
-        planet: Optional[Planet] = None,
+        thermodynamic_system: Optional[ThermodynamicSystemProtocol] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
-        total_pressure_constraint: Optional[ArrayLike] = None,
         solver_parameters: Optional[SolverParameters] = None,
     ):
         """Creates an instance
 
         Args:
             species: Species
-            planet: Planet. Defaults to a new instance of ``Planet``.
+            thermodynamic_system: Thermodynamic system. Defaults to a new instance of ``Planet``.
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 a new instance of ``FugacityConstraints``.
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
                 a new instance of ``MassConstraints``.
-            total_pressure_constraint: Total pressure constraint. Defaults to a new instance of
-                ``TotalPressureConstraint``.
             solver_parameters: Solver parameters. Defaults to a new instance of
                 ``SolverParameters``.
 
         Returns:
             An instance
         """
-        planet_: Planet = Planet() if planet is None else planet
+        thermodynamic_system_: ThermodynamicSystemProtocol = (
+            Planet() if thermodynamic_system is None else thermodynamic_system
+        )
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
             species, fugacity_constraints
         )
         mass_constraints_: MassConstraints = MassConstraints.create(species, mass_constraints)
-        total_pressure_constraint_: TotalPressureConstraint = TotalPressureConstraint.create(
-            total_pressure_constraint
-        )
 
         # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
         # that should remain scalar)
         batch_size: int = get_batch_size(
-            (planet, fugacity_constraints, mass_constraints, total_pressure_constraint_)
+            (thermodynamic_system, fugacity_constraints, mass_constraints)
         )
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
@@ -976,10 +1061,9 @@ class Parameters(eqx.Module):
 
         return cls(
             species,
-            planet_,
+            thermodynamic_system_,
             fugacity_constraints_,
             mass_constraints_,
-            total_pressure_constraint_,
             solver_parameters_,
             batch_size,
         )

@@ -30,9 +30,9 @@ from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import Formula
 from scipy.constants import mega
 
-from atmodeller.containers import Parameters, Planet, SpeciesCollection
+from atmodeller.containers import Parameters, SpeciesCollection
 from atmodeller.engine_vmap import VmappedFunctions
-from atmodeller.interfaces import RedoxBufferProtocol
+from atmodeller.interfaces import RedoxBufferProtocol, ThermodynamicSystemProtocol
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat
 
@@ -90,9 +90,9 @@ class Output:
         return self.parameters.batch_size
 
     @property
-    def planet(self) -> Planet:
-        """Planet"""
-        return self.parameters.planet
+    def thermodynamic_system(self) -> ThermodynamicSystemProtocol:
+        """Thermodynamic system"""
+        return self.parameters.thermodynamic_system
 
     @property
     def species(self) -> SpeciesCollection:
@@ -102,7 +102,7 @@ class Output:
     @property
     def temperature(self) -> NpFloat:  # Must return 1-D for shape consistency
         """Temperature"""
-        return np.atleast_1d(self.planet.temperature)
+        return np.atleast_1d(self.thermodynamic_system.temperature)
 
     def activity(self) -> NpFloat:  # 2-D
         """Gets the activity of all species.
@@ -143,14 +143,23 @@ class Output:
         out |= self.condensed_species_asdict(molar_mass, self.number_moles, activity)
         out |= self.elements_asdict()
 
-        out["planet"] = broadcast_arrays_in_dict(self.planet.asdict(), self.number_solutions)
-        out["gas"] = self.gas_asdict()
-        # Temperature and pressure have already been expanded to the number of solutions
-        temperature: NpFloat = out["planet"]["surface_temperature"]
-        pressure: NpFloat = out["gas"]["pressure"]
-        # Convenient to also attach temperature to the gas output
-        out["gas"]["temperature"] = temperature
+        out["system"] = broadcast_arrays_in_dict(
+            self.thermodynamic_system.asdict(), self.number_solutions
+        )
+        # Always add/overwrite the pressure with the evaluation from the model, which by-passes the
+        # need to re-evaluate the get_pressure method of thermodynamic_system.
+        out["system"]["pressure"] = self.total_pressure()
+        # This assumes the volume is given by the ideal gas law and does not account for the
+        # volume of condensates.
+        out["system"]["volume"] = self.gas_volume()
+
         out["raw"] = self.raw_solution_asdict()
+
+        out["gas"] = self.gas_asdict()
+
+        # Temperature and pressure have already been expanded to the number of solutions
+        temperature: NpFloat = out["system"]["temperature"]
+        pressure: NpFloat = out["system"]["pressure"]
 
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
@@ -207,8 +216,6 @@ class Output:
         out = {key: value.ravel() for key, value in out.items()}
 
         # Below must all be 1-D so that dataframes can be created.
-        out["pressure"] = self.total_pressure()
-        out["volume"] = self.gas_volume()
         out["element_number"] = np.sum(self.element_moles_gas(), axis=1)  # 1-D
         out["element_number_density"] = out["element_number"] / self.gas_volume()
 

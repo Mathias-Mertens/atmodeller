@@ -62,10 +62,10 @@ All gas species
      - Number density in all reservoirs
    * - volume_mixing_ratio
      - mol mol\ :math:`^{-1}`
-     - Volume mixing ratio
+     - Volume mixing ratio in the gas
    * - gas_mass_fraction
      - kg kg\ :math:`^{-1}`
-     - Mass fraction in the gas phase
+     - Mass fraction in the gas
 
 O2_g additional outputs
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -173,12 +173,31 @@ Element outputs have a dictionary key associated with the element name with an `
      - mol mol\ :math:`^{-1}`
      - Volume mixing ratio
 
-Planet
-------
+Thermodynamic system
+--------------------
 
-The planet output has a dictionary key of `planet`.
+The thermodynamic system output has a dictionary key of `system`. The exact set of outputs depends on the type of thermodynamic system being considered:
 
-.. list-table:: Outputs for planet
+.. list-table:: Outputs for all thermodynamic systems
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Name
+     - Units
+     - Description
+   * - temperature
+     - K
+     - Temperature
+   * - pressure
+     - bar
+     - Pressure   
+   * - volume
+     - m\ :math:`^3`
+     - Volume
+
+For a planet, the thermodynamic system provides the following additional outputs:
+
+.. list-table:: Planet-specific outputs
    :widths: 25 25 50
    :header-rows: 1
 
@@ -212,9 +231,6 @@ The planet output has a dictionary key of `planet`.
    * - surface_radius
      - m
      - Radius of the planetary surface
-   * - surface_temperature
-     - K
-     - Temperature at the planetary surface
 
 Gas phase (totals)
 ------------------
@@ -240,21 +256,12 @@ The gas phase output has a dictionary key of `gas`.
    * - molar_mass
      - kg mol\ :math:`^{-1}`
      - Molar mass
-   * - pressure
-     - bar
-     - Total pressure of the gas
-   * - volume
-     - m\ :math:`^{3}`
-     - Volume of the gas
    * - element_number
      - mol
      - Number of moles of elements
    * - element_number_density
      - mol m\ :math:`^{-3}`
      - Number density of elements
-   * - temperature
-     - K
-     - Temperature of the gas
   
 Other output
 ------------

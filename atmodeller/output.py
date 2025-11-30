@@ -190,8 +190,8 @@ class OutputSolution(Output):
         out: dict[str, dict[str, NpArray]] = super().asdict()
 
         # Temperature and pressure have already been expanded to the number of solutions
-        temperature: NpFloat = out["planet"]["surface_temperature"]
-        pressure: NpFloat = out["gas"]["pressure"]
+        temperature: NpFloat = out["system"]["temperature"]
+        pressure: NpFloat = out["system"]["pressure"]
 
         out["constraints"] = {}
         out["constraints"] |= broadcast_arrays_in_dict(
@@ -201,13 +201,6 @@ class OutputSolution(Output):
             self.parameters.fugacity_constraints.asdict(temperature, pressure),
             self.number_solutions,
         )
-        pressure_constraints = broadcast_arrays_in_dict(
-            self.parameters.total_pressure_constraint.asdict(), self.number_solutions
-        )
-        # Only export the total pressure constraint if it is applied for at least one of the cases.
-        if np.any(~np.isnan(pressure_constraints["total_pressure"])):
-            out["constraints"] |= pressure_constraints
-
         out["residual"] = self.residual_asdict()  # type: ignore since keys are int
 
         out["solver"] = {

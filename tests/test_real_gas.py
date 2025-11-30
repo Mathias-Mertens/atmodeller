@@ -72,7 +72,7 @@ def test_fO2_holley(helper) -> None:
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g))
     # Temperature is within the range of the Holley model
-    planet: Planet = Planet(surface_temperature=1000)
+    planet: Planet = Planet(temperature=1000)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
@@ -104,7 +104,7 @@ def test_fO2_holley(helper) -> None:
 def test_chabrier_earth(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21`"""
 
-    planet: Planet = Planet(surface_temperature=3400)
+    planet: Planet = Planet(temperature=3400)
     h_kg: ArrayLike = 0.01 * planet.planet_mass
     si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
     o_kg: ArrayLike = h_kg * 10
@@ -145,9 +145,7 @@ def test_chabrier_subNeptune(helper) -> None:
     planet_mass = 4.6 * 5.97224e24  # kg
     surface_radius = 1.5 * 6371000  # m
     planet: Planet = Planet(
-        surface_temperature=surface_temperature,
-        planet_mass=planet_mass,
-        surface_radius=surface_radius,
+        temperature=surface_temperature, planet_mass=planet_mass, surface_radius=surface_radius
     )
     h_kg: ArrayLike = 0.01 * planet.planet_mass
     si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
@@ -192,9 +190,7 @@ def test_chabrier_subNeptune_batch(helper) -> None:
     planet_mass = 4.6 * 5.97224e24  # kg
     surface_radius = 1.5 * 6371000  # m
     planet: Planet = Planet(
-        surface_temperature=surface_temperature,
-        planet_mass=planet_mass,
-        surface_radius=surface_radius,
+        temperature=surface_temperature, planet_mass=planet_mass, surface_radius=surface_radius
     )
     h_kg: ArrayLike = 0.01 * planet.planet_mass
     si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)

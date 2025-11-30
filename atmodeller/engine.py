@@ -44,7 +44,7 @@ from jaxmod.units import unit_conversion
 from jaxmod.utils import safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, Shaped
 
-from atmodeller.containers import Parameters, Planet, SpeciesCollection
+from atmodeller.containers import Parameters, SpeciesCollection
 from atmodeller.type_aliases import NpBool
 
 
@@ -244,8 +244,7 @@ def get_log_activity_pure_species(
     Returns:
         Log activity of pure species
     """
-    planet: Planet = parameters.planet
-    temperature: Float[Array, ""] = planet.temperature
+    temperature: Float[Array, ""] = parameters.thermodynamic_system.temperature
     species: SpeciesCollection = parameters.species
     total_pressure: Float[Array, ""] = get_total_pressure(parameters, log_number_moles)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
@@ -285,7 +284,9 @@ def get_log_Kp(parameters: Parameters) -> Float[Array, " reactions"]:
 
     indices: Integer[Array, " species"] = jnp.arange(len(parameters.species))
     vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
-    gibbs_values: Float[Array, "species 1"] = vmap_gibbs(indices, parameters.planet.temperature)
+    gibbs_values: Float[Array, "species 1"] = vmap_gibbs(
+        indices, parameters.thermodynamic_system.temperature
+    )
     # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
     reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
         parameters.species.reaction_matrix
@@ -372,7 +373,7 @@ def get_species_moles_in_melt(
         Number of moles of species dissolved in melt
     """
     molar_masses: ArrayLike = parameters.species.molar_masses
-    melt_mass: Float[Array, ""] = parameters.planet.mantle_melt_mass
+    melt_mass: Float[Array, ""] = parameters.thermodynamic_system.melt_mass
 
     ppmw: Float[Array, " species"] = get_species_ppmw_in_melt(parameters, log_number_moles)
 
@@ -398,7 +399,7 @@ def get_species_ppmw_in_melt(
     """
     species: SpeciesCollection = parameters.species
     diatomic_oxygen_index: Integer[Array, ""] = jnp.array(parameters.species.diatomic_oxygen_index)
-    temperature: Float[Array, ""] = parameters.planet.temperature
+    temperature: Float[Array, ""] = parameters.thermodynamic_system.temperature
 
     log_activity: Float[Array, " species"] = get_log_activity(parameters, log_number_moles)
     fugacity: Float[Array, " species"] = safe_exp(log_activity)
@@ -430,13 +431,31 @@ def get_species_ppmw_in_melt(
     return species_ppmw
 
 
+def get_gas_mass(
+    parameters: Parameters, log_number_moles: Float[Array, " species"]
+) -> Float[Array, ""]:
+    """Gets the gas mass.
+
+    Args:
+        parameters: Parameters
+        log_number_moles: Log number of moles
+
+    Returns:
+        Gas mass
+    """
+    gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
+        parameters, parameters.species.molar_masses
+    )
+    log_gas_mass: Float[Array, ""] = logsumexp(log_number_moles + jnp.log(gas_molar_mass))
+    gas_mass: Float[Array, ""] = jnp.exp(log_gas_mass)
+
+    return gas_mass
+
+
 def get_total_pressure(
     parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, ""]:
-    """Gets total pressure.
-
-    A total pressure constraint is used if specified, otherwise the default behaviour is to compute
-    the total pressure from the mechanical pressure balance at the planetary surface.
+    """Gets the total pressure.
 
     Args:
         parameters: Parameters
@@ -445,34 +464,10 @@ def get_total_pressure(
     Returns:
         Total pressure in bar
     """
-    # Check whether user supplied an explicit total-pressure constraint
-    constraint_active: Bool[Array, ""] = parameters.total_pressure_constraint.active()
+    gas_mass: Float[Array, ""] = get_gas_mass(parameters, log_number_moles)
+    pressure: Float[Array, ""] = parameters.thermodynamic_system.get_pressure(gas_mass)
 
-    # Option 1: Mechanical pressure balance
-    gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
-        parameters, parameters.species.molar_masses
-    )
-    mechanical_pressure_species: Float[Array, " species"] = (
-        jnp.exp(log_number_moles)
-        * gas_molar_mass
-        * parameters.planet.surface_gravity
-        / parameters.planet.surface_area
-    )
-    mechanical_pressure: Float[Array, ""] = (
-        jnp.sum(mechanical_pressure_species) * unit_conversion.Pa_to_bar
-    )
-    # jax.debug.print("mechanical_pressure = {out}", out=mechanical_pressure)
-
-    # Option 2: Imposed pressure
-    imposed_pressure: Float[Array, ""] = jnp.exp(parameters.total_pressure_constraint.log_pressure)
-    # jax.debug.print("imposed_pressure = {out}", out=imposed_pressure)
-
-    total_pressure: Float[Array, ""] = jnp.where(
-        constraint_active, imposed_pressure, mechanical_pressure
-    )
-    # jax.debug.print("total_pressure = {out}", out=total_pressure)
-
-    return total_pressure
+    return pressure
 
 
 def objective_function(
@@ -496,7 +491,7 @@ def objective_function(
         Residual
     """
     # jax.debug.print("Starting new objective_function evaluation")
-    temperature: Float[Array, ""] = parameters.planet.temperature
+    temperature: Float[Array, ""] = parameters.thermodynamic_system.temperature
 
     log_number_moles, log_stability = jnp.split(solution, 2)
     # jax.debug.print("log_number_moles = {out}", out=log_number_moles)

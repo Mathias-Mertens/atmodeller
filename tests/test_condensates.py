@@ -49,7 +49,7 @@ CHO_system: InteriorAtmosphere = InteriorAtmosphere(species)
 def test_graphite_stable(helper) -> None:
     """Tests graphite stable with around 50% condensed C mass fraction"""
 
-    planet: Planet = Planet(surface_temperature=873)
+    planet: Planet = Planet(temperature=873)
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(np.nan)
     }
@@ -88,7 +88,7 @@ def test_graphite_unstable(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
 
-    planet: Planet = Planet(surface_temperature=1400)
+    planet: Planet = Planet(temperature=1400)
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -119,7 +119,7 @@ def test_water_stable(helper) -> None:
     """Condensed water at 10 bar"""
 
     species: SpeciesCollection = SpeciesCollection.create(("H2_g", "H2O_g", "O2_g", "H2O_l"))
-    planet: Planet = Planet(surface_temperature=411.75)
+    planet: Planet = Planet(temperature=411.75)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     oceans: float = 1
@@ -128,7 +128,7 @@ def test_water_stable(helper) -> None:
     mass_constraints = {"H": h_kg, "O": o_kg}
 
     interior_atmosphere.solve(
-        planet=planet, mass_constraints=mass_constraints, solver_type="basic"
+        planet=planet, mass_constraints=mass_constraints, solver_type="robust"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -150,7 +150,7 @@ def test_graphite_water_stable(helper) -> None:
     species: SpeciesCollection = SpeciesCollection.create(
         ("H2O_g", "H2_g", "O2_g", "CO_g", "CO2_g", "CH4_g", "H2O_l", "C_cr")
     )
-    planet: Planet = Planet(surface_temperature=430)
+    planet: Planet = Planet(temperature=430)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     h_kg: float = 3.10e20
@@ -198,7 +198,7 @@ def test_impose_stable(helper) -> None:
 
     # We still specify a planet, even though the only parameter of relevance is the temperature
     # Melt fraction is set to zero for completeness, but again is irrelevant without solubility.
-    planet: Planet = Planet(surface_temperature=1500, mantle_melt_fraction=0)
+    planet: Planet = Planet(temperature=1500, mantle_melt_fraction=0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     # Only specify fugacity constraints
@@ -248,7 +248,7 @@ def test_impose_stable_activity(helper) -> None:
 
     # We still specify a planet, even though the only parameter of relevance is the temperature
     # Melt fraction is set to zero for completeness, but again is irrelevant without solubility.
-    planet: Planet = Planet(surface_temperature=1500, mantle_melt_fraction=0)
+    planet: Planet = Planet(temperature=1500, mantle_melt_fraction=0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     # Only specify fugacity constraints
@@ -294,7 +294,8 @@ def test_impose_stable_pressure(helper) -> None:
 
     species: SpeciesCollection = SpeciesCollection((C_cr, H2_g, N2_g, CHN_g, Ar_g))
 
-    planet: Planet = Planet(surface_temperature=1500, mantle_melt_fraction=0)
+    # Specify the total pressure of the system
+    planet: Planet = Planet(temperature=1500, mantle_melt_fraction=0, pressure=1)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     # Specify fugacity constraints for some species
@@ -304,14 +305,9 @@ def test_impose_stable_pressure(helper) -> None:
         "H2_g": ConstantFugacityConstraint(0.1),
         "N2_g": ConstantFugacityConstraint(0.2),
     }
-    # Specify the total pressure of the system
-    total_pressure_constraint: ArrayLike = 1
 
     interior_atmosphere.solve(
-        planet=planet,
-        fugacity_constraints=fugacity_constraints,
-        total_pressure_constraint=total_pressure_constraint,
-        solver_type="basic",
+        planet=planet, fugacity_constraints=fugacity_constraints, solver_type="robust"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()

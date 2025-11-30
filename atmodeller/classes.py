@@ -95,7 +95,6 @@ class InteriorAtmosphere:
         planet: Optional[Planet] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
-        total_pressure_constraint: Optional[ArrayLike] = None,
         solver_parameters: Optional[SolverParameters] = None,
         solver_type: Literal["basic", "robust"] = "robust",
         solver_recompile: bool = False,
@@ -118,19 +117,13 @@ class InteriorAtmosphere:
             planet: Planet. Defaults to ``None``.
             fugacity_constraints: Fugacity constraints. Defaults to ``None``.
             mass_constraints: Mass constraints. Defaults to ``None``.
-            total_pressure_constraint: Total pressure constraint. Defaults to ``None``.
             solver_parameters: Solver parameters. Defaults to ``None``.
             solver_type: Build a basic (faster) or a robust (slower) solver. Defaults to
                 ``robust``.
             solver_recompile: Force recompilation of the solver. Defaults to ``False``.
         """
         parameters: Parameters = Parameters.create(
-            self.species,
-            planet,
-            fugacity_constraints,
-            mass_constraints,
-            total_pressure_constraint,
-            solver_parameters,
+            self.species, planet, fugacity_constraints, mass_constraints, solver_parameters
         )
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_moles,
