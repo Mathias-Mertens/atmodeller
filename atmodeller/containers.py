@@ -595,7 +595,7 @@ class ConstantFugacityConstraint(eqx.Module):
     This must adhere to FugacityConstraintProtocol
 
     Args:
-        fugacity: Fugacity. Defaults to ``np.nan``.
+        fugacity: Fugacity in bar. Defaults to ``np.nan``.
     """
 
     fugacity: Array = eqx.field(converter=as_j64, default=np.nan)
@@ -682,7 +682,7 @@ class FugacityConstraints(eqx.Module):
 
         Args:
             temperature: Temperature in K
-            pressure: Pressure
+            pressure: Pressure in bar
 
         Returns:
             A dictionary of the evaluated fugacity constraints
@@ -877,12 +877,16 @@ class MassConstraints(eqx.Module):
         Returns:
             A dictionary of the values
         """
-        abundance: NpArray = np.asarray(self.abundance_mol())
-        out: dict[str, NpArray] = {
-            f"{element}_number": abundance[:, idx]
-            for idx, element in enumerate(self.species.unique_elements)
-            if not np.all(np.isnan(abundance[:, idx]))
-        }
+        abundance_mol: NpArray = np.asarray(self.abundance_mol())
+        abundance_mass: NpArray = np.asarray(self.abundance_mass())
+
+        out: dict[str, NpArray] = {}
+
+        for label, arr in [("number", abundance_mol), ("mass", abundance_mass)]:
+            for idx, element in enumerate(self.species.unique_elements):
+                col = arr[:, idx]
+                if not np.all(np.isnan(col)):
+                    out[f"{element}_{label}"] = col
 
         return out
 
