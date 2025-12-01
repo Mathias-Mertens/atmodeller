@@ -191,9 +191,6 @@ The thermodynamic system output has a dictionary key of `system`. The exact set 
    * - pressure
      - bar
      - Pressure   
-   * - volume
-     - m\ :math:`^3`
-     - Volume
 
 For a planet, the thermodynamic system provides the following additional outputs:
 
@@ -262,11 +259,38 @@ The gas phase output has a dictionary key of `gas`.
    * - element_number_density
      - mol m\ :math:`^{-3}`
      - Number density of elements
-  
+   * - volume
+     - m\ :math:`^3`
+     - Volume from the ideal gas law
+
+Solver
+------
+
+The solver has a dictionary key of `solver`.
+
+.. list-table:: Outputs for solver
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Name
+     - Type
+     - Description
+   * - status
+     - Boolean
+     - Indicates whether the solver terminated successfully according to its internal convergence criteria
+   * - steps
+     - Integer
+     - Number of iterations taken during the successful attempt
+   * - attempts
+     - Integer
+     - Total number of solver attempts (e.g., in a multistart procedure).
+   * - converged
+     - Boolean
+     - Indicates whether the solution meets the objective-based convergence criteria (independent of solver status).
+
 Other output
 ------------
 
 - constraints: Applied elemental mass and/or species fugacity constraints
-- raw: Raw solution from the solver, i.e. number of moles and stabilities
+- raw: Raw solution from the solver, i.e. number of moles and active stabilities
 - residual: Residuals of the reaction network and mass balance
-- solver: Solver quantities
