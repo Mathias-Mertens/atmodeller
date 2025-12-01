@@ -693,7 +693,7 @@ class FugacityConstraints(eqx.Module):
         out: dict[str, NpArray] = {
             # Subtle, but np.exp will collapse scalar array to 0-D, violating the type hint.
             f"{key}_fugacity": np.exp(np.atleast_1d(log_fugacity_list[idx]))
-            for idx, key in enumerate(self.species)
+            for idx, key in enumerate(self.species.species_names)
             if not np.all(np.isnan(log_fugacity_list[idx]))
         }
 
