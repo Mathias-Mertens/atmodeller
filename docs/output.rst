@@ -263,6 +263,28 @@ The gas phase output has a dictionary key of `gas`.
      - m\ :math:`^3`
      - Volume from the ideal gas law
 
+Constraints
+-----------
+
+The constraints have a dictionary key of `constraints`.
+
+.. list-table:: Outputs for constraints
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Name
+     - Units
+     - Description
+   * - [element]\_number
+     - mol
+     - Number of moles of "element"
+   * - [element]\_mass
+     - kg
+     - Mass of "element"
+   * - [species]\_fugacity
+     - bar
+     - Fugacity of species
+
 Solver
 ------
 
