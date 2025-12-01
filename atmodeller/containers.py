@@ -623,13 +623,13 @@ class FugacityConstraints(eqx.Module):
 
     Args:
         constraints: Fugacity constraints
-        species: Species corresponding to the columns of ``constraints``
+        species: Species
     """
 
     constraints: tuple[FugacityConstraintProtocol, ...]
     """Fugacity constraints"""
-    species: tuple[str, ...]
-    """Species corresponding to the entries of constraints"""
+    species: SpeciesCollection
+    """Species"""
 
     @classmethod
     def create(
@@ -651,12 +651,9 @@ class FugacityConstraints(eqx.Module):
             fugacity_constraints if fugacity_constraints is not None else {}
         )
 
-        # All unique species
-        unique_species: tuple[str, ...] = species.species_names
-
         constraints: list[FugacityConstraintProtocol] = []
 
-        for species_name in unique_species:
+        for species_name in species.species_names:
             if species_name in fugacity_constraints_:
                 constraints.append(fugacity_constraints_[species_name])
             else:
@@ -665,7 +662,7 @@ class FugacityConstraints(eqx.Module):
                 # means no imposed fugacity.
                 constraints.append(ConstantFugacityConstraint())
 
-        return cls(tuple(constraints), unique_species)
+        return cls(tuple(constraints), species)
 
     def active(self) -> Bool[Array, "..."]:
         """Active fugacity constraints
