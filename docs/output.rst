@@ -33,9 +33,6 @@ All gas species
    * - dissolved_number
      - mol
      - Number of moles in the melt
-   * - dissolved_number_density
-     - mol m\ :math:`^{-3}`
-     - Number density in the melt
    * - dissolved_ppmw
      - kg kg\ :math:`^{-1}` (ppm by weight)
      - Dissolved mass relative to melt mass
@@ -57,9 +54,6 @@ All gas species
    * - total_number
      - mol
      - Number of moles in all reservoirs
-   * - total_number_density
-     - mol m\ :math:`^{-3}`
-     - Number density in all reservoirs
    * - volume_mixing_ratio
      - mol mol\ :math:`^{-1}`
      - Volume mixing ratio in the gas
@@ -108,9 +102,6 @@ Species output have a dictionary key associated with the species name and its st
    * - total_number
      - mol
      - Number of moles
-   * - total_number_density
-     - mol m\ :math:`^{-3}`
-     - Number density
 
 Elements
 --------
@@ -139,9 +130,6 @@ Element outputs have a dictionary key associated with the element name with an `
    * - condensed_number
      - mol
      - Number of moles in condensed species
-   * - condensed_number_density
-     - mol m\ :math:`^{-3}`
-     - Number density in condensed species
    * - degree_of_condensation
      - dimensionless
      - Degree of condensation
@@ -151,9 +139,6 @@ Element outputs have a dictionary key associated with the element name with an `
    * - dissolved_number
      - mol
      - Number of moles in the melt
-   * - dissolved_number_density
-     - mol m\ :math:`^{-3}`
-     - Number density in the melt
    * - logarithmic_abundance
      - dimensionless
      - Logarithmic abundance
@@ -166,12 +151,12 @@ Element outputs have a dictionary key associated with the element name with an `
    * - total_number
      - mol
      - Number of moles in all reservoirs
-   * - total_number_density
-     - mol m\ :math:`^{-3}`
-     - Number density in all reservoirs
    * - volume_mixing_ratio
      - mol mol\ :math:`^{-1}`
      - Volume mixing ratio
+   * - gas_mass_fraction
+     - kg kg\ :math:`^{-1}`
+     - Mass fraction in the gas
 
 Thermodynamic system
 --------------------
@@ -190,7 +175,7 @@ The thermodynamic system output has a dictionary key of `system`. The exact set 
      - Temperature
    * - pressure
      - bar
-     - Pressure   
+     - Pressure
 
 For a planet, the thermodynamic system provides the following additional outputs:
 
@@ -313,6 +298,5 @@ The solver has a dictionary key of `solver`.
 Other output
 ------------
 
-- constraints: Applied elemental mass and/or species fugacity constraints
 - raw: Raw solution from the solver, i.e. number of moles and active stabilities
 - residual: Residuals of the reaction network and mass balance

@@ -28,7 +28,6 @@ from jaxmod.constants import GAS_CONSTANT_BAR
 from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import Formula
-from scipy.constants import mega
 
 from atmodeller.containers import Parameters, SpeciesCollection
 from atmodeller.engine_vmap import VmappedFunctions
@@ -205,6 +204,8 @@ class Output:
         out: dict[str, NpArray] = self._get_number_moles_output(
             gas_number_moles, gas_molar_mass, "species_"
         )
+        # Volume must be a column vector because it multiples all elements in the row
+        out["species_number_density"] = gas_number_moles / self.ideal_gas_volume()[:, np.newaxis]
         # Species mass is simply mass so rename for clarity
         out["mass"] = out.pop("species_mass")
 
@@ -304,6 +305,9 @@ class Output:
         total: NpArray = gas + condensed + dissolved
 
         out: dict[str, NpArray] = self._get_number_moles_output(gas, molar_mass, "gas_")
+        # Volume must be a column vector because it multiples all elements in the row
+        out["gas_number_density"] = gas / self.ideal_gas_volume()[:, np.newaxis]
+
         out |= self._get_number_moles_output(condensed, molar_mass, "condensed_")
         out |= self._get_number_moles_output(dissolved, molar_mass, "dissolved_")
         out |= self._get_number_moles_output(total, molar_mass, "total_")
@@ -313,9 +317,7 @@ class Output:
         out["volume_mixing_ratio"] = out["gas_number"] / np.sum(
             out["gas_number"], axis=1, keepdims=True
         )
-        out["gas_mass_fraction"] = (
-            out["gas_mass"] / np.sum(out["gas_mass"], axis=1, keepdims=True) * mega
-        )
+        out["gas_mass_fraction"] = out["gas_mass"] / np.sum(out["gas_mass"], axis=1, keepdims=True)
 
         unique_elements: tuple[str, ...] = self.species.unique_elements
         if "H" in unique_elements:
@@ -401,8 +403,6 @@ class Output:
             Dictionary of output quantities
         """
         out: dict[str, NpArray] = {}
-        # Volume must be a column vector because it multiples all elements in the row
-        out[f"{prefix}number_density"] = number_moles / self.ideal_gas_volume()[:, np.newaxis]
         out[f"{prefix}number"] = number_moles
         out[f"{prefix}mass"] = number_moles * molar_mass_expanded
 
@@ -435,14 +435,13 @@ class Output:
 
         out: dict[str, NpArray] = {}
         out |= self._get_number_moles_output(number_moles, molar_mass, "gas_")
+        # Volume must be a column vector because it multiples all elements in the row
+        out["gas_number_density"] = number_moles / self.ideal_gas_volume()[:, np.newaxis]
         out |= self._get_number_moles_output(dissolved_number_moles, molar_mass, "dissolved_")
         out |= self._get_number_moles_output(total_number_moles, molar_mass, "total_")
         out["molar_mass"] = molar_mass
-        out["volume_mixing_ratio"] = out["gas_number"] / np.sum(
-            out["gas_number"], axis=1, keepdims=True
-        )
-        out["gas_ppm"] = out["volume_mixing_ratio"] * mega
-        out["gas_ppmw"] = out["gas_mass"] / np.sum(out["gas_mass"], axis=1, keepdims=True) * mega
+        out["volume_mixing_ratio"] = number_moles / np.sum(number_moles, axis=1, keepdims=True)
+        out["gas_mass_fraction"] = out["gas_mass"] / np.sum(out["gas_mass"], axis=1, keepdims=True)
         out["pressure"] = pressure
         out["fugacity"] = activity
         out["fugacity_coefficient"] = activity / pressure
