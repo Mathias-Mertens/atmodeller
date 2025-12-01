@@ -149,9 +149,6 @@ class Output:
         # Always add/overwrite the pressure with the evaluation from the model, which by-passes the
         # need to re-evaluate the get_pressure method of thermodynamic_system.
         out["system"]["pressure"] = self.total_pressure()
-        # This assumes the volume is given by the ideal gas law and does not account for the
-        # volume of condensates.
-        out["system"]["volume"] = self.gas_volume()
 
         out["raw"] = self.raw_solution_asdict()
 
@@ -217,7 +214,8 @@ class Output:
 
         # Below must all be 1-D so that dataframes can be created.
         out["element_number"] = np.sum(self.element_moles_gas(), axis=1)  # 1-D
-        out["element_number_density"] = out["element_number"] / self.gas_volume()
+        out["element_number_density"] = out["element_number"] / self.ideal_gas_volume()
+        out["volume"] = self.ideal_gas_volume()
 
         return out
 
@@ -241,8 +239,8 @@ class Output:
         """
         return np.exp(self.gas_log_molar_mass())
 
-    def gas_volume(self) -> NpFloat:  # 1-D
-        """Gets the volume of the gas.
+    def ideal_gas_volume(self) -> NpFloat:  # 1-D
+        """Gets the volume of the gas assuming it is ideal.
 
         Returns:
             Volume of the gas
@@ -404,7 +402,7 @@ class Output:
         """
         out: dict[str, NpArray] = {}
         # Volume must be a column vector because it multiples all elements in the row
-        out[f"{prefix}number_density"] = number_moles / self.gas_volume()[:, np.newaxis]
+        out[f"{prefix}number_density"] = number_moles / self.ideal_gas_volume()[:, np.newaxis]
         out[f"{prefix}number"] = number_moles
         out[f"{prefix}mass"] = number_moles * molar_mass_expanded
 
@@ -522,7 +520,7 @@ class Output:
             self.number_moles
             * GAS_CONSTANT_BAR
             * self.temperature[:, np.newaxis]
-            / self.gas_volume()[:, np.newaxis]
+            / self.ideal_gas_volume()[:, np.newaxis]
         )
 
         return pressure
