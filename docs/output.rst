@@ -214,6 +214,28 @@ For a planet, the thermodynamic system provides the following additional outputs
      - m
      - Radius of the planetary surface
 
+Instead, a generic thermodynamic system has the following additional outputs:
+
+.. list-table:: Thermodynamic system-specific outputs
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Name
+     - Units
+     - Description
+   * - mass
+     - kg
+     - Mass of the condensed phase
+   * - melt_fraction
+     - kg kg\ :math:`^{-1}`
+     - Fraction of the condensed phase that is molten
+   * - melt_mass
+     - kg
+     - Mass of the molten condensed phase
+   * - solid_mass
+     - kg
+     - Mass of the solid condensed phase
+
 Gas phase (totals)
 ------------------
 
