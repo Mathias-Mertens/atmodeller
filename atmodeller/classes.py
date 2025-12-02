@@ -27,8 +27,8 @@ import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
-from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
-from atmodeller.interfaces import FugacityConstraintProtocol
+from atmodeller.containers import Parameters, SolverParameters, SpeciesCollection
+from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicSystemProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
@@ -67,7 +67,9 @@ class InteriorAtmosphere:
 
         return self._output
 
-    def calculate_disequilibrium(self, *, planet: Planet, log_number_moles: ArrayLike) -> None:
+    def calculate_disequilibrium(
+        self, *, system: ThermodynamicSystemProtocol, log_number_moles: ArrayLike
+    ) -> None:
         """Computes the Gibbs free energy disequilibrium.
 
         This method calculates the Gibbs free energy difference (ΔG) for each considered reaction
@@ -76,10 +78,10 @@ class InteriorAtmosphere:
         from equilibrium in terms of energetic favourability.
 
         Args:
-            planet: Planet
+            system: Thermodynamic system
             log_number_moles: Log number of moles
         """
-        parameters: Parameters = Parameters.create(self.species, planet)
+        parameters: Parameters = Parameters.create(self.species, system)
         solution_array: Array = broadcast_initial_solution(
             log_number_moles, None, self.species.number_species, parameters.batch_size
         )
@@ -92,7 +94,7 @@ class InteriorAtmosphere:
         *,
         initial_log_number_moles: Optional[ArrayLike] = None,
         initial_log_stability: Optional[ArrayLike] = None,
-        planet: Optional[Planet] = None,
+        system: Optional[ThermodynamicSystemProtocol] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         solver_parameters: Optional[SolverParameters] = None,
@@ -114,7 +116,7 @@ class InteriorAtmosphere:
         Args:
             initial_log_number_moles: Initial log number of moles. Defaults to ``None``.
             initial_log_stability: Initial log stability. Defaults to ``None``.
-            planet: Planet. Defaults to ``None``.
+            system: Thermodynamic system. Defaults to ``None``.
             fugacity_constraints: Fugacity constraints. Defaults to ``None``.
             mass_constraints: Mass constraints. Defaults to ``None``.
             solver_parameters: Solver parameters. Defaults to ``None``.
@@ -123,7 +125,7 @@ class InteriorAtmosphere:
             solver_recompile: Force recompilation of the solver. Defaults to ``False``.
         """
         parameters: Parameters = Parameters.create(
-            self.species, planet, fugacity_constraints, mass_constraints, solver_parameters
+            self.species, system, fugacity_constraints, mass_constraints, solver_parameters
         )
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_moles,
