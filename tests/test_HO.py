@@ -72,7 +72,7 @@ def test_H2O(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     interior_atmosphere.solve(
-        planet=planet, mass_constraints=mass_constraints, solver_type="basic"
+        system=planet, mass_constraints=mass_constraints, solver_type="basic"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -95,7 +95,7 @@ def test_H_O(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 
     interior_atmosphere.solve(
-        planet=planet, mass_constraints=mass_constraints, solver_type="basic"
+        system=planet, mass_constraints=mass_constraints, solver_type="basic"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -121,7 +121,7 @@ def test_H_fO2(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     gas_HO_system.solve(
-        planet=planet,
+        system=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_type="basic",
@@ -148,7 +148,7 @@ def test_H_fO2_fH2(helper) -> None:
     }
 
     gas_HO_system.solve(
-        planet=planet,
+        system=planet,
         fugacity_constraints=fugacity_constraints,
         solver_type="basic",
         solver_recompile=True,
@@ -170,7 +170,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
 
     # Number of surface temperatures is different to number of species to test array shapes work.
     surface_temperatures: NpFloat = np.array([1500, 2000, 2500, 3000])
-    planet: Planet = Planet(surface_temperature=surface_temperatures)
+    planet: Planet = Planet(temperature=surface_temperatures)
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(),
         "H2_g": ConstantFugacityConstraint(np.nan),
@@ -180,7 +180,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     gas_HO_system.solve(
-        planet=planet,
+        system=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_type="basic",
@@ -234,7 +234,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     gas_HO_system.solve(
-        planet=planet,
+        system=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_type="basic",
@@ -286,7 +286,7 @@ def test_H_fO2_batch_H_mass(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, 10 * h_kg, 100 * h_kg])}
 
     gas_HO_system.solve(
-        planet=planet,
+        system=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_type="basic",
