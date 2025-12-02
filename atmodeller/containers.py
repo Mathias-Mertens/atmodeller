@@ -389,14 +389,26 @@ class ThermodynamicSystem(eqx.Module):
         melt_fraction: Melt fraction by weight in kg/kg. Defaults to ``1`` kg/kg.
     """
 
-    temperature: Array = eqx.field(converter=as_j64)
+    temperature: Array
     """Temperature in K"""
-    pressure: Array = eqx.field(converter=as_j64)
+    pressure: Array
     """Pressure in bar"""
-    mass: Array = eqx.field(converter=as_j64, default=1)
+    mass: Array
     """Mass in kg"""
-    melt_fraction: Array = eqx.field(converter=as_j64, default=1)
+    melt_fraction: Array
     """Mass fraction of melt in kg/kg"""
+
+    def __init__(
+        self,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        mass: ArrayLike = 1,
+        melt_fraction: ArrayLike = 1,
+    ):
+        self.temperature = as_j64(temperature)
+        self.pressure = as_j64(pressure)
+        self.mass = as_j64(mass)
+        self.melt_fraction = as_j64(melt_fraction)
 
     @property
     def melt_mass(self) -> Array:
