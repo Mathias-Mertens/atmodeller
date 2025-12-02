@@ -60,7 +60,7 @@ def test_graphite_stable(helper) -> None:
     mass_constraints = {"C": c_kg, "H": h_kg, "O": o_kg}
 
     CHO_system.solve(
-        planet=planet,
+        system=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_type="basic",
@@ -96,7 +96,7 @@ def test_graphite_unstable(helper) -> None:
     mass_constraints = {"C": c_kg, "H": h_kg}
 
     CHO_system.solve(
-        planet=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        system=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
     output: Output = CHO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -128,7 +128,7 @@ def test_water_stable(helper) -> None:
     mass_constraints = {"H": h_kg, "O": o_kg}
 
     interior_atmosphere.solve(
-        planet=planet, mass_constraints=mass_constraints, solver_type="robust"
+        system=planet, mass_constraints=mass_constraints, solver_type="robust"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -159,7 +159,7 @@ def test_graphite_water_stable(helper) -> None:
     mass_constraints = {"C": c_kg, "H": h_kg, "O": o_kg}
 
     interior_atmosphere.solve(
-        planet=planet, mass_constraints=mass_constraints, solver_type="basic"
+        system=planet, mass_constraints=mass_constraints, solver_type="basic"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -211,7 +211,7 @@ def test_impose_stable(helper) -> None:
     }
 
     interior_atmosphere.solve(
-        planet=planet, fugacity_constraints=fugacity_constraints, solver_type="basic"
+        system=planet, fugacity_constraints=fugacity_constraints, solver_type="basic"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -261,7 +261,7 @@ def test_impose_stable_activity(helper) -> None:
     }
 
     interior_atmosphere.solve(
-        planet=planet, fugacity_constraints=fugacity_constraints, solver_type="basic"
+        system=planet, fugacity_constraints=fugacity_constraints, solver_type="basic"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -307,7 +307,7 @@ def test_impose_stable_pressure(helper) -> None:
     }
 
     interior_atmosphere.solve(
-        planet=planet, fugacity_constraints=fugacity_constraints, solver_type="robust"
+        system=planet, fugacity_constraints=fugacity_constraints, solver_type="robust"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()

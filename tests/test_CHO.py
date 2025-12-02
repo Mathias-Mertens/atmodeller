@@ -74,7 +74,7 @@ def test_H_and_C(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
     interior_atmosphere.solve(
-        planet=planet,
+        system=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_type="basic",
@@ -108,7 +108,7 @@ def test_CHO_reduced(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     gas_CHO_system.solve(
-        planet=planet,
+        system=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_type="basic",
@@ -142,7 +142,7 @@ def test_CHO_IW(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     gas_CHO_system.solve(
-        planet=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        system=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
     output: Output = gas_CHO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -184,7 +184,7 @@ def test_CHO_oxidised(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     gas_CHO_system.solve(
-        planet=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        system=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
     output: Output = gas_CHO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -218,7 +218,7 @@ def test_CHO_highly_oxidised(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     gas_CHO_system.solve(
-        planet=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        system=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
     output: Output = gas_CHO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -246,7 +246,7 @@ def test_CHO_middle_temperature(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
     gas_CHO_system.solve(
-        planet=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        system=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
     output: Output = gas_CHO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -279,7 +279,7 @@ def test_CHO_low_temperature(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
     gas_CHO_system.solve(
-        planet=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        system=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
     output: Output = gas_CHO_system.output
     solution: dict[str, ArrayLike] = output.quick_look()

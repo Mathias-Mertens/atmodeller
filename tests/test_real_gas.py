@@ -84,7 +84,7 @@ def test_fO2_holley(helper) -> None:
     }
 
     interior_atmosphere.solve(
-        planet=planet,
+        system=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_type="basic",
@@ -110,7 +110,7 @@ def test_chabrier_earth(helper) -> None:
     o_kg: ArrayLike = h_kg * 10
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    subneptune_system.solve(planet=planet, mass_constraints=mass_constraints, solver_type="basic")
+    subneptune_system.solve(system=planet, mass_constraints=mass_constraints, solver_type="basic")
     output: Output = subneptune_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
@@ -157,7 +157,7 @@ def test_chabrier_subNeptune(helper) -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    subneptune_system.solve(planet=planet, mass_constraints=mass_constraints)
+    subneptune_system.solve(system=planet, mass_constraints=mass_constraints)
     output: Output = subneptune_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
@@ -204,7 +204,7 @@ def test_chabrier_subNeptune_batch(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
     subneptune_system.solve(
-        planet=planet,
+        system=planet,
         mass_constraints=mass_constraints,
         solver_type="basic",
         solver_recompile=True,
@@ -248,7 +248,7 @@ def test_pH2_fO2_real_gas(helper) -> None:
     }
 
     interior_atmosphere.solve(
-        planet=planet, fugacity_constraints=fugacity_constraints, solver_type="basic"
+        system=planet, fugacity_constraints=fugacity_constraints, solver_type="basic"
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -302,7 +302,7 @@ def test_H_and_C_real_gas(helper) -> None:
     solver_parameters = SolverParameters(multistart=5)
 
     interior_atmosphere.solve(
-        planet=planet,
+        system=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_parameters=solver_parameters,
