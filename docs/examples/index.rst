@@ -5,6 +5,7 @@ Examples
    :maxdepth: 1
 
    basic_examples
-   iterative_examples
-   geological_example
-   atmosphere_example
+   iteration
+   geological_outgassing
+   gas_mixing
+   atmosphere

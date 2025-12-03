@@ -134,6 +134,7 @@ from atmodeller.containers import (  # noqa: E402, F401
     SolverParameters,
     Species,
     SpeciesCollection,
+    ThermodynamicSystem,
 )
 from atmodeller.utilities import (  # noqa: E402, F401
     bulk_silicate_earth_abundances,
