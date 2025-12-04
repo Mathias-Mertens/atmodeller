@@ -9,3 +9,4 @@ Examples
    geological_outgassing
    gas_mixing
    atmosphere
+   fugacity_crisis
