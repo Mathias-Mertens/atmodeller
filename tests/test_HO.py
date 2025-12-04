@@ -87,8 +87,7 @@ def test_H_O(helper) -> None:
 
     species: SpeciesNetwork = SpeciesNetwork.create(("H2_g", "H2O_g", "O2_g"))
 
-    # Specify the total pressure of the system
-    planet: Planet = Planet(pressure=np.array([np.nan, 1000, 100, 1]))
+    planet: Planet = Planet()
     model: EquilibriumModel = EquilibriumModel(species)
 
     oceans: ArrayLike = 1
@@ -96,10 +95,8 @@ def test_H_O(helper) -> None:
     o_kg: ArrayLike = 6.25774e20
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 
-    interior_atmosphere.solve(
-        system=planet, mass_constraints=mass_constraints, solver_type="basic"
-    )
-    output: Output = interior_atmosphere.output
+    model.solve(state=planet, mass_constraints=mass_constraints, solver_type="basic")
+    output: Output = model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     fastchem_result: dict[str, float] = {
@@ -107,6 +104,8 @@ def test_H_O(helper) -> None:
         "H2_g": 73.84378192,
         "O2_g": 8.91399329e-08,
     }
+
+    output.to_excel("test_H_O")
 
     assert helper.isclose(solution, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
