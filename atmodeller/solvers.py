@@ -78,7 +78,9 @@ def solve_single_system(
         args=parameters,
         throw=parameters.solver_parameters.throw,
         max_steps=parameters.solver_parameters.max_steps,
-        options=parameters.solver_parameters.get_options(parameters.species.number_species),
+        options=parameters.solver_parameters.get_options(
+            parameters.species_network.number_species
+        ),
     )
 
     return sol
@@ -311,7 +313,7 @@ def make_solver(parameters: Parameters) -> Callable:
             :class:`~jaxmod.solvers.MultiAttemptSolution` object
         """
         # Define the condition to check if active stability is enabled
-        condition: Bool[Array, ""] = jnp.any(parameters.species.active_stability)
+        condition: Bool[Array, ""] = jnp.any(parameters.species_network.active_stability)
 
         def solve_with_stability_multistart(key):
             """Function for multistart with stability"""

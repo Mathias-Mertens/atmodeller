@@ -44,7 +44,7 @@ from jaxmod.units import unit_conversion
 from jaxmod.utils import safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, Shaped
 
-from atmodeller.containers import Parameters, SpeciesCollection
+from atmodeller.containers import Parameters, SpeciesNetwork
 from atmodeller.type_aliases import NpBool
 
 
@@ -58,9 +58,9 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
         Active mask
     """
     fugacity_mask: Bool[Array, " dim"] = parameters.fugacity_constraints.active()
-    reactions_mask: ArrayLike = parameters.species.active_reactions
+    reactions_mask: ArrayLike = parameters.species_network.active_reactions
     mass_mask: Bool[Array, " dim"] = parameters.mass_constraints.active()
-    stability_mask: ArrayLike = parameters.species.active_stability
+    stability_mask: ArrayLike = parameters.species_network.active_stability
 
     # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
     # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
@@ -91,10 +91,10 @@ def get_atmosphere_log_molar_mass(
         parameters, log_number_moles
     )
     gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
-        parameters, parameters.species.molar_masses
+        parameters, parameters.species_network.molar_masses
     )
     molar_mass: Float[Array, ""] = logsumexp(gas_log_number_moles, b=gas_molar_mass) - logsumexp(
-        gas_log_number_moles, b=parameters.species.gas_species_mask
+        gas_log_number_moles, b=parameters.species_network.gas_species_mask
     )
     # jax.debug.print("molar_mass = {out}", out=molar_mass)
 
@@ -119,7 +119,7 @@ def get_element_moles(
     species_moles: Array = jnp.nan_to_num(safe_exp(log_number_moles), nan=0.0)
 
     formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
-        parameters.species.formula_matrix
+        parameters.species_network.formula_matrix
     )
     element_moles: Float[Array, " elements"] = formula_matrix @ species_moles
 
@@ -142,7 +142,7 @@ def get_element_moles_in_melt(
         parameters, log_number_moles
     )
     formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
-        parameters.species.formula_matrix
+        parameters.species_network.formula_matrix
     )
     element_melt_moles: Float[Array, " species"] = formula_matrix @ species_melt_moles
 
@@ -162,7 +162,7 @@ def get_gas_species_data(
         An array with gas species data from `some_array` and condensate entries zeroed
     """
     gas_data: Shaped[Array, " species"] = (
-        jnp.asarray(some_array) * parameters.species.gas_species_mask
+        jnp.asarray(some_array) * parameters.species_network.gas_species_mask
     )
 
     return gas_data
@@ -180,7 +180,9 @@ def get_log_mole_fraction_in_gas(
     Returns:
         Log mole fraction in the gas
     """
-    gas_species_mask: Bool[Array, " species"] = jnp.array(parameters.species.gas_species_mask)
+    gas_species_mask: Bool[Array, " species"] = jnp.array(
+        parameters.species_network.gas_species_mask
+    )
 
     # Represent mask in log space: True -> 0, False -> -inf
     log_mask: Float[Array, " species"] = jnp.where(gas_species_mask, 0.0, -jnp.inf)
@@ -210,7 +212,9 @@ def get_log_activity(
     Returns:
         Log activity
     """
-    gas_species_mask: Bool[Array, " species"] = jnp.array(parameters.species.gas_species_mask)
+    gas_species_mask: Bool[Array, " species"] = jnp.array(
+        parameters.species_network.gas_species_mask
+    )
 
     log_mole_fraction: Float[Array, " species"] = get_log_mole_fraction_in_gas(
         parameters, log_number_moles
@@ -244,8 +248,8 @@ def get_log_activity_pure_species(
     Returns:
         Log activity of pure species
     """
-    temperature: Float[Array, ""] = parameters.thermodynamic_system.temperature
-    species: SpeciesCollection = parameters.species
+    temperature: Float[Array, ""] = parameters.state.temperature
+    species: SpeciesNetwork = parameters.species_network
     total_pressure: Float[Array, ""] = get_total_pressure(parameters, log_number_moles)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
@@ -274,7 +278,7 @@ def get_log_Kp(parameters: Parameters) -> Float[Array, " reactions"]:
         Log of the equilibrium constant of each reaction in terms of partial pressures
     """
     gibbs_funcs: list[Callable] = [
-        to_hashable(species_.data.get_gibbs_over_RT) for species_ in parameters.species
+        to_hashable(species_.data.get_gibbs_over_RT) for species_ in parameters.species_network
     ]
 
     def apply_gibbs(
@@ -282,14 +286,12 @@ def get_log_Kp(parameters: Parameters) -> Float[Array, " reactions"]:
     ) -> Float[Array, "..."]:
         return lax.switch(index, gibbs_funcs, temperature)
 
-    indices: Integer[Array, " species"] = jnp.arange(len(parameters.species))
+    indices: Integer[Array, " species"] = jnp.arange(len(parameters.species_network))
     vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
-    gibbs_values: Float[Array, "species 1"] = vmap_gibbs(
-        indices, parameters.thermodynamic_system.temperature
-    )
+    gibbs_values: Float[Array, "species 1"] = vmap_gibbs(indices, parameters.state.temperature)
     # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
     reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
-        parameters.species.reaction_matrix
+        parameters.species_network.reaction_matrix
     )
     log_Kp: Float[Array, "reactions 1"] = -1.0 * reaction_matrix @ gibbs_values
 
@@ -308,7 +310,7 @@ def get_min_log_elemental_abundance_per_species(
         A vector of the minimum log elemental abundance for each species
     """
     formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
-        parameters.species.formula_matrix
+        parameters.species_network.formula_matrix
     )
     # Create the binary mask where formula_matrix != 0 (1 where element is present in species)
     mask: Integer[Array, "elements species"] = (formula_matrix != 0).astype(jnp.int_)
@@ -344,11 +346,11 @@ def get_reactions_only_mask(parameters: Parameters) -> Bool[Array, " dim"]:
         Reactions only mask for the residual array
     """
     # Create a full mask of False
-    size: int = parameters.species.number_solution
+    size: int = parameters.species_network.number_solution
     mask: Bool[Array, " dim"] = jnp.zeros(size, dtype=bool)
 
     fugacity_mask: Bool[Array, " dim"] = parameters.fugacity_constraints.active()
-    reactions_mask: NpBool = parameters.species.active_reactions
+    reactions_mask: NpBool = parameters.species_network.active_reactions
     num_active_fugacity: Integer[Array, ""] = jnp.sum(fugacity_mask)
 
     # Place the reactions_mask at position num_active_fugacity dynamically.
@@ -372,8 +374,8 @@ def get_species_moles_in_melt(
     Returns:
         Number of moles of species dissolved in melt
     """
-    molar_masses: ArrayLike = parameters.species.molar_masses
-    melt_mass: Float[Array, ""] = parameters.thermodynamic_system.melt_mass
+    molar_masses: ArrayLike = parameters.species_network.molar_masses
+    melt_mass: Float[Array, ""] = parameters.state.melt_mass
 
     ppmw: Float[Array, " species"] = get_species_ppmw_in_melt(parameters, log_number_moles)
 
@@ -397,9 +399,9 @@ def get_species_ppmw_in_melt(
     Returns:
         ppmw of species dissolved in melt
     """
-    species: SpeciesCollection = parameters.species
-    diatomic_oxygen_index: Integer[Array, ""] = jnp.array(parameters.species.diatomic_oxygen_index)
-    temperature: Float[Array, ""] = parameters.thermodynamic_system.temperature
+    species_network: SpeciesNetwork = parameters.species_network
+    diatomic_oxygen_index: Integer[Array, ""] = jnp.array(species_network.diatomic_oxygen_index)
+    temperature: Float[Array, ""] = parameters.state.temperature
 
     log_activity: Float[Array, " species"] = get_log_activity(parameters, log_number_moles)
     fugacity: Float[Array, " species"] = safe_exp(log_activity)
@@ -408,7 +410,7 @@ def get_species_ppmw_in_melt(
 
     # NOTE: All solubility formulations must return a JAX array to allow vmap
     solubility_funcs: list[Callable] = [
-        to_hashable(species_.solubility.jax_concentration) for species_ in species
+        to_hashable(species_.solubility.jax_concentration) for species_ in species_network
     ]
 
     def apply_solubility(
@@ -423,7 +425,7 @@ def get_species_ppmw_in_melt(
             diatomic_oxygen_fugacity,
         )
 
-    indices: Integer[Array, " species"] = jnp.arange(len(species))
+    indices: Integer[Array, " species"] = jnp.arange(len(species_network))
     vmap_solubility: Callable = eqx.filter_vmap(apply_solubility, in_axes=(0, 0))
     species_ppmw: Float[Array, " species"] = vmap_solubility(indices, fugacity)
     # jax.debug.print("ppmw = {out}", out=ppmw)
@@ -444,7 +446,7 @@ def get_gas_mass(
         Gas mass
     """
     gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
-        parameters, parameters.species.molar_masses
+        parameters, parameters.species_network.molar_masses
     )
     log_gas_mass: Float[Array, ""] = logsumexp(log_number_moles + jnp.log(gas_molar_mass))
     gas_mass: Float[Array, ""] = jnp.exp(log_gas_mass)
@@ -465,7 +467,7 @@ def get_total_pressure(
         Total pressure in bar
     """
     gas_mass: Float[Array, ""] = get_gas_mass(parameters, log_number_moles)
-    pressure: Float[Array, ""] = parameters.thermodynamic_system.get_pressure(gas_mass)
+    pressure: Float[Array, ""] = parameters.state.get_pressure(gas_mass)
 
     return pressure
 
@@ -491,7 +493,7 @@ def objective_function(
         Residual
     """
     # jax.debug.print("Starting new objective_function evaluation")
-    temperature: Float[Array, ""] = parameters.thermodynamic_system.temperature
+    temperature: Float[Array, ""] = parameters.state.temperature
 
     log_number_moles, log_stability = jnp.split(solution, 2)
     # jax.debug.print("log_number_moles = {out}", out=log_number_moles)
@@ -522,7 +524,7 @@ def objective_function(
 
     # Reaction network residual
     reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
-        parameters.species.reaction_matrix
+        parameters.species_network.reaction_matrix
     )
 
     log_reaction_equilibrium_constant: Float[Array, " reactions"] = get_log_Kp(parameters)
@@ -534,7 +536,7 @@ def objective_function(
     )
     # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual.shape)
     reaction_stability_mask: Bool[Array, "reactions species"] = jnp.broadcast_to(
-        parameters.species.active_stability, reaction_matrix.shape
+        parameters.species_network.active_stability, reaction_matrix.shape
     )
     reaction_stability_matrix: Float[Array, "reactions species"] = (
         reaction_matrix * reaction_stability_mask
@@ -620,7 +622,7 @@ def objective_function(
 
     active_mask: Bool[Array, " dim"] = get_active_mask(parameters)
     # jax.debug.print("active_mask = {out}", out=active_mask)
-    size: int = parameters.species.number_solution
+    size: int = parameters.species_network.number_solution
     # jax.debug.print("size = {out}", out=size)
 
     active_indices: Integer[Array, "..."] = jnp.where(active_mask, size=size)[0]

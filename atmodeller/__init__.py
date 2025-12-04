@@ -127,14 +127,14 @@ def debug_file_logger() -> logging.Logger:
     return package_logger
 
 
-from atmodeller.classes import InteriorAtmosphere  # noqa: E402, F401
+from atmodeller.classes import EquilibriumModel  # noqa: E402, F401
 from atmodeller.containers import (  # noqa: E402, F401
-    ConstantFugacityConstraint,
+    ChemicalSpecies,
+    FixedFugacityConstraint,
     Planet,
     SolverParameters,
-    Species,
-    SpeciesCollection,
-    ThermodynamicSystem,
+    SpeciesNetwork,
+    ThermodynamicState,
 )
 from atmodeller.utilities import (  # noqa: E402, F401
     bulk_silicate_earth_abundances,

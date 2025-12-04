@@ -88,7 +88,7 @@ class OutputDisequilibrium(Output):
             self.number_moles, axis=1, keepdims=True
         )
         # logger.debug("number_fraction = %s", number_fraction)
-        reaction_matrix: NpFloat = self.parameters.species.reaction_matrix
+        reaction_matrix: NpFloat = self.parameters.species_network.reaction_matrix
         # logger.debug("reaction_matrix = %s", reaction_matrix)
 
         out: dict[str, NpArray] = {}

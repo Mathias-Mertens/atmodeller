@@ -24,12 +24,12 @@ import pytest
 from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
-from atmodeller.classes import InteriorAtmosphere, SolverParameters
+from atmodeller.classes import EquilibriumModel, SolverParameters
 from atmodeller.containers import (
-    ConstantFugacityConstraint,
+    ChemicalSpecies,
+    FixedFugacityConstraint,
     Planet,
-    Species,
-    SpeciesCollection,
+    SpeciesNetwork,
 )
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import (
@@ -53,27 +53,29 @@ ATOL: float = 1.0e-6
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 eos_models: Mapping[str, ActivityProtocol] = get_eos_models()
 
-H2_g: Species = Species.create_gas("H2", activity=eos_models["H2_chabrier21"])
-H2O_g: Species = Species.create_gas("H2O")
-O2_g: Species = Species.create_gas("O2")
-SiO_g: Species = Species.create_gas("OSi")
-H4Si_g: Species = Species.create_gas("H4Si")
-O2Si_l: Species = Species.create_condensed("O2Si", state="l")
-species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, SiO_g, O2Si_l))
-subneptune_system: InteriorAtmosphere = InteriorAtmosphere(species)
+H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2", activity=eos_models["H2_chabrier21"])
+H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
+O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+SiO_g: ChemicalSpecies = ChemicalSpecies.create_gas("OSi")
+H4Si_g: ChemicalSpecies = ChemicalSpecies.create_gas("H4Si")
+O2Si_l: ChemicalSpecies = ChemicalSpecies.create_condensed("O2Si", state="l")
+species: SpeciesNetwork = SpeciesNetwork((H2_g, H2O_g, O2_g, H4Si_g, SiO_g, O2Si_l))
+subneptune_model: EquilibriumModel = EquilibriumModel(species)
 
 
 def test_fO2_holley(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`HWZ58`"""
 
-    H2_g: Species = Species.create_gas("H2", activity=eos_models["H2_beattie_holley58"])
-    H2O_g: Species = Species.create_gas("H2O")
-    O2_g: Species = Species.create_gas("O2")
+    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas(
+        "H2", activity=eos_models["H2_beattie_holley58"]
+    )
+    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
+    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
 
-    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g))
+    species: SpeciesNetwork = SpeciesNetwork((H2_g, H2O_g, O2_g))
     # Temperature is within the range of the Holley model
     planet: Planet = Planet(temperature=1000)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
+    model: EquilibriumModel = EquilibriumModel(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
@@ -83,13 +85,13 @@ def test_fO2_holley(helper) -> None:
         "H": h_kg,
     }
 
-    interior_atmosphere.solve(
-        system=planet,
+    model.solve(
+        state=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_type="basic",
     )
-    output: Output = interior_atmosphere.output
+    output: Output = model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -110,8 +112,8 @@ def test_chabrier_earth(helper) -> None:
     o_kg: ArrayLike = h_kg * 10
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    subneptune_system.solve(system=planet, mass_constraints=mass_constraints, solver_type="basic")
-    output: Output = subneptune_system.output
+    subneptune_model.solve(state=planet, mass_constraints=mass_constraints, solver_type="basic")
+    output: Output = subneptune_model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -157,8 +159,8 @@ def test_chabrier_subNeptune(helper) -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    subneptune_system.solve(system=planet, mass_constraints=mass_constraints)
-    output: Output = subneptune_system.output
+    subneptune_model.solve(state=planet, mass_constraints=mass_constraints)
+    output: Output = subneptune_model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -203,13 +205,13 @@ def test_chabrier_subNeptune_batch(helper) -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    subneptune_system.solve(
-        system=planet,
+    subneptune_model.solve(
+        state=planet,
         mass_constraints=mass_constraints,
         solver_type="basic",
         solver_recompile=True,
     )
-    output: Output = subneptune_system.output
+    output: Output = subneptune_model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
@@ -229,28 +231,28 @@ def test_pH2_fO2_real_gas(helper) -> None:
 
     Applies a constraint to the fugacity of H2.
     """
-    H2O_g: Species = Species.create_gas(
+    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas(
         "H2O",
         solubility=solubility_models["H2O_peridotite_sossi23"],
         activity=eos_models["H2O_cork_holland98"],
     )
-    H2_g: Species = Species.create_gas("H2", activity=eos_models["H2_cork_cs_holland91"])
-    O2_g: Species = Species.create_gas("O2")
+    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas(
+        "H2", activity=eos_models["H2_cork_cs_holland91"]
+    )
+    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
 
-    species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g))
+    species: SpeciesNetwork = SpeciesNetwork((H2O_g, H2_g, O2_g))
     planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
+    model: EquilibriumModel = EquilibriumModel(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "O2_g": ConstantFugacityConstraint(1.0453574209588085e-07),
+        "O2_g": FixedFugacityConstraint(1.0453574209588085e-07),
         # Gives a H2 partial pressure of around 1000 bar
-        "H2_g": ConstantFugacityConstraint(1493.1),
+        "H2_g": FixedFugacityConstraint(1493.1),
     }
 
-    interior_atmosphere.solve(
-        system=planet, fugacity_constraints=fugacity_constraints, solver_type="basic"
-    )
-    output: Output = interior_atmosphere.output
+    model.solve(state=planet, fugacity_constraints=fugacity_constraints, solver_type="basic")
+    output: Output = model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -266,32 +268,36 @@ def test_pH2_fO2_real_gas(helper) -> None:
 def test_H_and_C_real_gas(helper) -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`."""
 
-    H2_g: Species = Species.create_gas(
+    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas(
         "H2",
         solubility=solubility_models["H2_basalt_hirschmann12"],
         activity=eos_models["H2_cork_cs_holland91"],
     )
-    H2O_g: Species = Species.create_gas(
+    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas(
         "H2O",
         solubility=solubility_models["H2O_peridotite_sossi23"],
         activity=eos_models["H2O_cork_holland98"],
     )
-    O2_g: Species = Species.create_gas("O2")
-    CO_g: Species = Species.create_gas("CO", activity=eos_models["CO_cork_cs_holland91"])
-    CO2_g: Species = Species.create_gas(
+    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+    CO_g: ChemicalSpecies = ChemicalSpecies.create_gas(
+        "CO", activity=eos_models["CO_cork_cs_holland91"]
+    )
+    CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas(
         "CO2",
         solubility=solubility_models["CO2_basalt_dixon95"],
         activity=eos_models["CO2_cork_holland98"],
     )
-    CH4_g: Species = Species.create_gas("CH4", activity=eos_models["CH4_cork_cs_holland91"])
+    CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas(
+        "CH4", activity=eos_models["CH4_cork_cs_holland91"]
+    )
 
-    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, CO_g, CO2_g, CH4_g))
+    species: SpeciesNetwork = SpeciesNetwork((H2_g, H2O_g, O2_g, CO_g, CO2_g, CH4_g))
     planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
+    model: EquilibriumModel = EquilibriumModel(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "H2_g": ConstantFugacityConstraint(958),
-        "O2_g": ConstantFugacityConstraint(1.0132255325169718e-07),
+        "H2_g": FixedFugacityConstraint(958),
+        "O2_g": FixedFugacityConstraint(1.0132255325169718e-07),
     }
 
     oceans: ArrayLike = 10
@@ -301,14 +307,14 @@ def test_H_and_C_real_gas(helper) -> None:
 
     solver_parameters = SolverParameters(multistart=5)
 
-    interior_atmosphere.solve(
-        system=planet,
+    model.solve(
+        state=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
         solver_parameters=solver_parameters,
         solver_type="basic",
     )
-    output: Output = interior_atmosphere.output
+    output: Output = model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {

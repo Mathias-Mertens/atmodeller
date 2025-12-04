@@ -74,7 +74,7 @@ class SolubilityProtocol(Protocol):
 
 
 @runtime_checkable
-class ThermodynamicSystemProtocol(Protocol):
+class ThermodynamicStateProtocol(Protocol):
     @property
     def mass(self) -> Array: ...
 

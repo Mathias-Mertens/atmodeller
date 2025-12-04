@@ -29,9 +29,9 @@ from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import Formula
 
-from atmodeller.containers import Parameters, SpeciesCollection
+from atmodeller.containers import Parameters, SpeciesNetwork
 from atmodeller.engine_vmap import VmappedFunctions
-from atmodeller.interfaces import RedoxBufferProtocol, ThermodynamicSystemProtocol
+from atmodeller.interfaces import RedoxBufferProtocol, ThermodynamicStateProtocol
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat
 
@@ -57,7 +57,7 @@ class Output:
         self.log_number_moles: NpFloat = log_number_moles  # 2-D
         # Mask stabilities that are not solved
         self.log_stability: NpFloat = np.where(
-            parameters.species.active_stability, log_stability, np.nan
+            parameters.species_network.active_stability, log_stability, np.nan
         )  # 2-D
         # Caching output to avoid recomputation
         self._cached_dict: Optional[dict[str, dict[str, NpArray]]] = None
@@ -66,17 +66,17 @@ class Output:
     @property
     def condensed_species_mask(self) -> NpBool:  # 1-D
         """Mask of condensed species"""
-        return np.invert(self.parameters.species.gas_species_mask)
+        return np.invert(self.parameters.species_network.gas_species_mask)
 
     @property
     def gas_species_mask(self) -> NpBool:  # 1-D
         """Mask of gas species"""
-        return self.parameters.species.gas_species_mask
+        return self.parameters.species_network.gas_species_mask
 
     @property
     def molar_mass(self) -> NpFloat:  # 1-D
         """Molar mass of all species"""
-        return self.parameters.species.molar_masses
+        return self.parameters.species_network.molar_masses
 
     @property
     def number_moles(self) -> NpFloat:  # 2-D
@@ -89,19 +89,19 @@ class Output:
         return self.parameters.batch_size
 
     @property
-    def thermodynamic_system(self) -> ThermodynamicSystemProtocol:
+    def state(self) -> ThermodynamicStateProtocol:
         """Thermodynamic system"""
-        return self.parameters.thermodynamic_system
+        return self.parameters.state
 
     @property
-    def species(self) -> SpeciesCollection:
+    def species(self) -> SpeciesNetwork:
         """Species"""
-        return self.parameters.species
+        return self.parameters.species_network
 
     @property
     def temperature(self) -> NpFloat:  # Must return 1-D for shape consistency
         """Temperature"""
-        return np.atleast_1d(self.thermodynamic_system.temperature)
+        return np.atleast_1d(self.state.temperature)
 
     def activity(self) -> NpFloat:  # 2-D
         """Gets the activity of all species.
@@ -142,9 +142,7 @@ class Output:
         out |= self.condensed_species_asdict(molar_mass, self.number_moles, activity)
         out |= self.elements_asdict()
 
-        out["system"] = broadcast_arrays_in_dict(
-            self.thermodynamic_system.asdict(), self.number_solutions
-        )
+        out["system"] = broadcast_arrays_in_dict(self.state.asdict(), self.number_solutions)
         # Always add/overwrite the pressure with the evaluation from the model, which by-passes the
         # need to re-evaluate the get_pressure method of thermodynamic_system.
         out["system"]["pressure"] = self.total_pressure()
@@ -469,7 +467,7 @@ class Output:
         )
         # Now select the appropriate activity for each species, depending if stability is relevant.
         condition_broadcasted = np.broadcast_to(
-            self.parameters.species.active_stability, log_activity_without_stability.shape
+            self.parameters.species_network.active_stability, log_activity_without_stability.shape
         )
         # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 
