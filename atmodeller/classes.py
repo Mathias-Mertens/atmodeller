@@ -39,7 +39,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 class EquilibriumModel:
     """An equilibrium model
 
-    This is the main class that the user interacts with to build equilibrium systems, solve them,
+    This is the main class that the user interacts with to build equilibrium models, solve them,
     and retrieve the results.
 
     Args:

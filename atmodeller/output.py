@@ -190,8 +190,8 @@ class OutputSolution(Output):
         out: dict[str, dict[str, NpArray]] = super().asdict()
 
         # Temperature and pressure have already been expanded to the number of solutions
-        temperature: NpFloat = out["system"]["temperature"]
-        pressure: NpFloat = out["system"]["pressure"]
+        temperature: NpFloat = out["state"]["temperature"]
+        pressure: NpFloat = out["state"]["pressure"]
 
         out["constraints"] = {}
         out["constraints"] |= broadcast_arrays_in_dict(

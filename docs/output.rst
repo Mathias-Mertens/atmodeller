@@ -158,12 +158,12 @@ Element outputs have a dictionary key associated with the element name with an `
      - kg kg\ :math:`^{-1}`
      - Mass fraction in the gas
 
-Thermodynamic system
---------------------
+State
+-----
 
-The thermodynamic system output has a dictionary key of `system`. The exact set of outputs depends on the type of thermodynamic system being considered:
+The thermodynamic state output has a dictionary key of `state`. The exact set of outputs depends on the type of thermodynamic state being considered:
 
-.. list-table:: Outputs for all thermodynamic systems
+.. list-table:: Outputs for all thermodynamic states
    :widths: 25 25 50
    :header-rows: 1
 
@@ -177,7 +177,7 @@ The thermodynamic system output has a dictionary key of `system`. The exact set 
      - bar
      - Pressure
 
-For a planet, the thermodynamic system provides the following additional outputs:
+For a planet, the thermodynamic state provides the following additional outputs:
 
 .. list-table:: Planet-specific outputs
    :widths: 25 25 50
@@ -214,9 +214,9 @@ For a planet, the thermodynamic system provides the following additional outputs
      - m
      - Radius of the planetary surface
 
-Instead, a generic thermodynamic system has the following additional outputs:
+Instead, a generic thermodynamic state has the following additional outputs:
 
-.. list-table:: Thermodynamic system-specific outputs
+.. list-table:: Thermodynamic state-specific outputs
    :widths: 25 25 50
    :header-rows: 1
 

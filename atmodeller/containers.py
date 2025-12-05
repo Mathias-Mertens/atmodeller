@@ -537,7 +537,7 @@ class ThinAtmospherePlanet(eqx.Module):
         """Surface gravity"""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / jnp.square(self.surface_radius)
 
-    # The following properties ensure compliance with ThermodynamicSystemProtocol
+    # The following properties ensure compliance with ThermodynamicStateProtocol
     @property
     def mass(self) -> Array:
         return self.mantle_mass
@@ -1047,7 +1047,7 @@ class Parameters(eqx.Module):
         Returns:
             An instance
         """
-        thermodynamic_system_: ThermodynamicStateProtocol = Planet() if state is None else state
+        state_: ThermodynamicStateProtocol = Planet() if state is None else state
         fugacity_constraints_: FugacityConstraintSet = FugacityConstraintSet.create(
             species_network, fugacity_constraints
         )
@@ -1071,7 +1071,7 @@ class Parameters(eqx.Module):
 
         return cls(
             species_network,
-            thermodynamic_system_,
+            state_,
             fugacity_constraints_,
             mass_constraints_,
             solver_parameters_,

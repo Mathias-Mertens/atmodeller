@@ -33,20 +33,20 @@ Downloading the source code is also recommended if you'd like access to the exam
 
 If you use Atmodeller, or data from Atmodeller, please cite:
 
-- Bower, D. J., Thompson, M. A., Hakim, K., Tian, M., and Sossi, P. A. (2025), Diversity of low-mass planet atmospheres in the C-H-O-N-S-Cl system with interior dissolution, nonideality and condensation: Application to TRAPPIST-1e and sub-Neptunes, The Astrophysical Journal, accepted. ArXiv e-print [2507.00499](https://arxiv.org/abs/2507.00499).
+- Bower, D. J., Thompson, M. A., Hakim, K., Tian, M., and Sossi, P. A. (2025), Diversity of low-mass planet atmospheres in the C&ndash;H&ndash;O&ndash;N&ndash;S&ndash;Cl system with interior dissolution, nonideality and condensation: Application to TRAPPIST-1e and sub-Neptunes, The Astrophysical Journal, 995(1), 59, doi: <https://www.doi.org/10.3847/1538-4357/ae1479>. ArXiv e-print [2507.00499](https://arxiv.org/abs/2507.00499).
 
-The data from the above study are also available for download at https://doi.org/10.17605/OSF.IO/PC5TD.
+The data from the above study are also available for download at <https://doi.org/10.17605/OSF.IO/PC5TD>.
 
 ## Basic usage
 
-Jupyter notebooks in the `notebooks/` directory demonstrate how to perform single and batch calculations, and how to perform iterative updates with changing constraints. A simple example of how to use Atmodeller is provided below:
+Several Jupyter notebooks providing examples are in the `notebooks/` directory. A simple example of how to use Atmodeller is provided below:
 
 ```
 from atmodeller import (
-    InteriorAtmosphere,
+    EquilibriumModel,
     Planet,
-    Species,
-    SpeciesCollection,
+    ChemicalSpecies,
+    SpeciesNetwork,
     earth_oceans_to_hydrogen_mass,
 )
 from atmodeller.solubility import get_solubility_models
@@ -55,21 +55,18 @@ solubility_models = get_solubility_models()
 # Get the available solubility models
 print("solubility models = ", solubility_models.keys())
 
-H2_g = Species.create_gas("H2")
-H2O_g = Species.create_gas("H2O", solubility=solubility_models["H2O_peridotite_sossi23"])
-O2_g = Species.create_gas("O2")
+H2_g = ChemicalSpecies.create_gas("H2")
+H2O_g = ChemicalSpecies.create_gas("H2O", solubility=solubility_models["H2O_peridotite_sossi23"])
+O2_g = ChemicalSpecies.create_gas("O2")
 
-species = SpeciesCollection((H2_g, H2O_g, O2_g))
+species = SpeciesNetwork((H2_g, H2O_g, O2_g))
 planet = Planet()
-interior_atmosphere = InteriorAtmosphere(species)
+interior_atmosphere = EquilibriumModel(species)
 
 oceans = 1
 h_kg = earth_oceans_to_hydrogen_mass(oceans)
 o_kg = 6.25774e20
-mass_constraints = {
-    "H": h_kg,
-    "O": o_kg,
-}
+mass_constraints = {"H": h_kg, "O": o_kg}
 
 # If you do not specify an initial solution guess then a default will be used
 # Initial solution guess number moles
