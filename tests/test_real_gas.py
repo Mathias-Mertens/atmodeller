@@ -20,23 +20,13 @@ import logging
 from typing import Mapping
 
 import numpy as np
-import pytest
 from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
-from atmodeller.classes import EquilibriumModel, SolverParameters
-from atmodeller.containers import (
-    ChemicalSpecies,
-    FixedFugacityConstraint,
-    Planet,
-    SpeciesNetwork,
-)
+from atmodeller.classes import EquilibriumModel
+from atmodeller.containers import ChemicalSpecies, Planet, SpeciesNetwork
 from atmodeller.eos.library import get_eos_models
-from atmodeller.interfaces import (
-    ActivityProtocol,
-    FugacityConstraintProtocol,
-    SolubilityProtocol,
-)
+from atmodeller.interfaces import ActivityProtocol, FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
@@ -246,84 +236,30 @@ def test_pH2_fO2_real_gas(helper) -> None:
     model: EquilibriumModel = EquilibriumModel(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "O2_g": FixedFugacityConstraint(1.0453574209588085e-07),
-        # Gives a H2 partial pressure of around 1000 bar
-        "H2_g": FixedFugacityConstraint(1493.1),
+        "O2_g": IronWustiteBuffer(0.072885576196744)
     }
 
-    model.solve(state=planet, fugacity_constraints=fugacity_constraints, solver_type="basic")
+    mass_constraints: dict[str, ArrayLike] = {"H": 1.47126255324872e22}
+
+    model.solve(
+        state=planet,
+        mass_constraints=mass_constraints,
+        fugacity_constraints=fugacity_constraints,
+        solver_type="basic",
+        # Guide the solver with an improved initial guess, otherwise use solver_type="robust".
+        initial_log_number_moles=np.array([54, 54, 31]),
+    )
     output: Output = model.output
+
+    # output.to_excel("pH2_fO2_real_gas")
     solution: dict[str, ArrayLike] = output.quick_look()
+
+    # logger.debug("solution = %s", pprint.pformat(solution))
 
     target: dict[str, float] = {
         "H2O_g": 1470.2567650857518,
         "H2_g": 999.9971214963639,
         "O2_g": 1.045357420958815e-07,
-    }
-
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
-
-
-@pytest.mark.skip(reason="Complicated test that can fail if multistart is not large enough")
-def test_H_and_C_real_gas(helper) -> None:
-    """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`."""
-
-    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas(
-        "H2",
-        solubility=solubility_models["H2_basalt_hirschmann12"],
-        activity=eos_models["H2_cork_cs_holland91"],
-    )
-    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas(
-        "H2O",
-        solubility=solubility_models["H2O_peridotite_sossi23"],
-        activity=eos_models["H2O_cork_holland98"],
-    )
-    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
-    CO_g: ChemicalSpecies = ChemicalSpecies.create_gas(
-        "CO", activity=eos_models["CO_cork_cs_holland91"]
-    )
-    CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas(
-        "CO2",
-        solubility=solubility_models["CO2_basalt_dixon95"],
-        activity=eos_models["CO2_cork_holland98"],
-    )
-    CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas(
-        "CH4", activity=eos_models["CH4_cork_cs_holland91"]
-    )
-
-    species: SpeciesNetwork = SpeciesNetwork((H2_g, H2O_g, O2_g, CO_g, CO2_g, CH4_g))
-    planet: Planet = Planet()
-    model: EquilibriumModel = EquilibriumModel(species)
-
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "H2_g": FixedFugacityConstraint(958),
-        "O2_g": FixedFugacityConstraint(1.0132255325169718e-07),
-    }
-
-    oceans: ArrayLike = 10
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
-    c_kg: ArrayLike = h_kg
-    mass_constraints: dict[str, ArrayLike] = {"C": c_kg}
-
-    solver_parameters = SolverParameters(multistart=5)
-
-    model.solve(
-        state=planet,
-        fugacity_constraints=fugacity_constraints,
-        mass_constraints=mass_constraints,
-        solver_parameters=solver_parameters,
-        solver_type="basic",
-    )
-    output: Output = model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
-
-    target: dict[str, float] = {
-        "CH4_g": 1.161221651357397e01,
-        "CO2_g": 6.719430723567530e01,
-        "CO_g": 2.768796027177136e02,
-        "H2O_g": 9.552659883631408e02,
-        "H2_g": 6.942030982137493e02,
-        "O2_g": 1.013225532516968e-07,
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
