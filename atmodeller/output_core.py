@@ -90,7 +90,7 @@ class Output:
 
     @property
     def state(self) -> ThermodynamicStateProtocol:
-        """Thermodynamic system"""
+        """Thermodynamic state"""
         return self.parameters.state
 
     @property
@@ -142,18 +142,18 @@ class Output:
         out |= self.condensed_species_asdict(molar_mass, self.number_moles, activity)
         out |= self.elements_asdict()
 
-        out["system"] = broadcast_arrays_in_dict(self.state.asdict(), self.number_solutions)
+        out["state"] = broadcast_arrays_in_dict(self.state.asdict(), self.number_solutions)
         # Always add/overwrite the pressure with the evaluation from the model, which by-passes the
-        # need to re-evaluate the get_pressure method of thermodynamic_system.
-        out["system"]["pressure"] = self.total_pressure()
+        # need to re-evaluate the get_pressure method of state.
+        out["state"]["pressure"] = self.total_pressure()
 
         out["raw"] = self.raw_solution_asdict()
 
         out["gas"] = self.gas_asdict()
 
         # Temperature and pressure have already been expanded to the number of solutions
-        temperature: NpFloat = out["system"]["temperature"]
-        pressure: NpFloat = out["system"]["pressure"]
+        temperature: NpFloat = out["state"]["temperature"]
+        pressure: NpFloat = out["state"]["pressure"]
 
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
