@@ -85,7 +85,7 @@ class ChemicalSpecies(eqx.Module):
         cls,
         formula: str,
         *,
-        state: str = "cr",
+        state: str = "cd",
         activity: ActivityProtocol = CondensateActivity(),
         solve_for_stability: bool = True,
     ) -> "ChemicalSpecies":
@@ -93,7 +93,7 @@ class ChemicalSpecies(eqx.Module):
 
         Args:
             formula: Formula
-            state: State of aggregation as defined by JANAF. Defaults to ``cr``.
+            state: State of aggregation as defined by JANAF. Defaults to ``cd``.
             activity: Activity. Defaults to ``1.0`` (unity activity).
             solve_for_stability. Solve for stability. Defaults to ``True``.
 
