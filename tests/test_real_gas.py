@@ -48,7 +48,7 @@ H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
 O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
 SiO_g: ChemicalSpecies = ChemicalSpecies.create_gas("OSi")
 H4Si_g: ChemicalSpecies = ChemicalSpecies.create_gas("H4Si")
-O2Si_l: ChemicalSpecies = ChemicalSpecies.create_condensed("O2Si", state="l")
+O2Si_l: ChemicalSpecies = ChemicalSpecies.create_condensed("O2Si", state="cd")
 species: SpeciesNetwork = SpeciesNetwork((H2_g, H2O_g, O2_g, H4Si_g, SiO_g, O2Si_l))
 subneptune_model: EquilibriumModel = EquilibriumModel(species)
 
