@@ -171,8 +171,8 @@ class SpeciesNetwork(eqx.Module):
     """Unique elements in species in alphabetical order"""
     element_molar_masses: NpFloat
     """Molar masses of the ordered elements"""
-    diatomic_oxygen_index: int
-    """Index of diatomic oxygen"""
+    diatomic_oxygen_index: int | float
+    """Index of diatomic oxygen or np.nan if not present"""
     number_reactions: int
     """Number of reactions"""
     formula_matrix: NpInt
@@ -266,23 +266,19 @@ class SpeciesNetwork(eqx.Module):
         """Number of species"""
         return len(self.data)
 
-    def get_diatomic_oxygen_index(self) -> int:
+    def get_diatomic_oxygen_index(self) -> int | float:
         """Gets the species index corresponding to diatomic oxygen.
 
         Returns:
-            Index of diatomic oxygen, or the first index if diatomic oxygen is not in the species
+            Index of diatomic oxygen, or the first index or np.nan if diatomic oxygen is not in
+                the species
         """
         for nn, species_ in enumerate(self.data):
             if species_.data.hill_formula == "O2":
                 # logger.debug("Found O2 at index = %d", nn)
                 return nn
 
-        # FIXME: Bad practice to return the first index because it could be wrong and therefore
-        # give rise to spurious results, but an index must be passed to evaluate the species
-        # solubility that may depend on fO2. Otherwise, a precheck could be be performed in which
-        # all the solubility laws chosen by the user are checked to see if they depend on fO2. And
-        # if so, and fO2 is not included in the model, an error is raised.
-        return 0
+        return np.nan
 
     def get_formula_matrix(self) -> NpInt:
         """Gets the formula matrix.
