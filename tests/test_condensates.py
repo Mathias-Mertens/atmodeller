@@ -28,7 +28,6 @@ from atmodeller.containers import ChemicalSpecies, Planet, SpeciesNetwork, Therm
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.thermodata import IronWustiteBuffer
-from atmodeller.thermodata.core import CondensateActivity
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
@@ -64,7 +63,7 @@ def test_graphite_stable(helper) -> None:
         state=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
-        solver_type="basic",
+        solver="basic",
     )
     output: Output = CHO_model.output
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -128,7 +127,7 @@ def test_water_stable(helper) -> None:
     o_kg: float = 1.14375e21
     mass_constraints = {"H": h_kg, "O": o_kg}
 
-    model.solve(state=planet, mass_constraints=mass_constraints, solver_type="robust")
+    model.solve(state=planet, mass_constraints=mass_constraints, solver="robust")
     output: Output = model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
@@ -157,7 +156,7 @@ def test_graphite_water_stable(helper) -> None:
     o_kg: float = 2.48298883581636e21
     mass_constraints = {"C": c_kg, "H": h_kg, "O": o_kg}
 
-    model.solve(state=planet, mass_constraints=mass_constraints, solver_type="basic")
+    model.solve(state=planet, mass_constraints=mass_constraints, solver="basic")
     output: Output = model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
@@ -180,12 +179,10 @@ def test_graphite_water_stable(helper) -> None:
 def test_impose_stable(helper) -> None:
     """Tests a user-imposed stable condensate"""
 
-    # Enforce the stability of graphite
     # Since in this example we do not provide carbon in the injected gas stream, we cannot solve
     # for the stability of any carbon-bearing products because in order to do so requires
     # specification of the mass of carbon in the system.
-    activity = CondensateActivity(1.0)
-    C_cr = ChemicalSpecies.create_condensed("C", activity=activity, solve_for_stability=False)
+    C_cr = ChemicalSpecies.create_condensed("C", solve_for_stability=False)
 
     # Define allowable gas species at equilibrium
     H2_g = ChemicalSpecies.create_gas("H2")
@@ -208,7 +205,7 @@ def test_impose_stable(helper) -> None:
     mass_constraints = {key: value * Formula(key).mass for key, value in mole_fractions.items()}
 
     # Solve
-    model.solve(state=state, mass_constraints=mass_constraints, solver_type="basic")
+    model.solve(state=state, mass_constraints=mass_constraints, solver="basic")
 
     output: Output = model.output
     solution: dict[str, ArrayLike] = output.quick_look()

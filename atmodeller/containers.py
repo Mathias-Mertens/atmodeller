@@ -94,7 +94,7 @@ class ChemicalSpecies(eqx.Module):
         Args:
             formula: Formula
             state: State of aggregation as defined by JANAF. Defaults to ``cd``.
-            activity: Activity. Defaults to ``1.0`` (unity activity).
+            activity: Activity. Defaults to unity activity.
             solve_for_stability. Solve for stability. Defaults to ``True``.
 
         Returns:
