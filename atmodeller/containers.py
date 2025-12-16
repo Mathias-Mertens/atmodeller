@@ -171,7 +171,7 @@ class SpeciesNetwork(eqx.Module):
     """Unique elements in species in alphabetical order"""
     element_molar_masses: NpFloat
     """Molar masses of the ordered elements"""
-    diatomic_oxygen_index: int | float
+    diatomic_oxygen_index: NpFloat
     """Index of diatomic oxygen or np.nan if not present"""
     number_reactions: int
     """Number of reactions"""
@@ -266,19 +266,21 @@ class SpeciesNetwork(eqx.Module):
         """Number of species"""
         return len(self.data)
 
-    def get_diatomic_oxygen_index(self) -> int | float:
+    def get_diatomic_oxygen_index(self) -> NpFloat:
         """Gets the species index corresponding to diatomic oxygen.
 
+        Note:
+            This returns a float array for type consistency.
+
         Returns:
-            Index of diatomic oxygen, or the first index or np.nan if diatomic oxygen is not in
-                the species
+            Index of diatomic oxygen, or np.nan if diatomic oxygen is not in the species
         """
         for nn, species_ in enumerate(self.data):
             if species_.data.hill_formula == "O2":
                 # logger.debug("Found O2 at index = %d", nn)
-                return nn
+                return np.array(nn, dtype=float)
 
-        return np.nan
+        return np.array(np.nan, dtype=float)
 
     def get_formula_matrix(self) -> NpInt:
         """Gets the formula matrix.

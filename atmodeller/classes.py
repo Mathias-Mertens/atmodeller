@@ -218,7 +218,7 @@ def _broadcast_component(
     if component is None:
         base: NpFloat = np.full((dim,), default_value, dtype=np.float64)
     else:
-        component = np.asarray(component, dtype=jnp.float64)
+        component = np.asarray(component, dtype=np.float64)
         if component.ndim == 0:
             base = np.full((dim,), component.item(), dtype=np.float64)
         elif component.ndim == 1:
