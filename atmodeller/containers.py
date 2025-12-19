@@ -33,6 +33,7 @@ from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import CompositionItem, Formula
 
 from atmodeller.constants import (
+    CONDENSED_STATE,
     GAS_STATE,
     LOG_NUMBER_MOLES_LOWER,
     LOG_NUMBER_MOLES_UPPER,
@@ -85,7 +86,7 @@ class ChemicalSpecies(eqx.Module):
         cls,
         formula: str,
         *,
-        state: str = "cd",
+        state: str = CONDENSED_STATE,
         activity: ActivityProtocol = CondensateActivity(),
         solve_for_stability: bool = True,
     ) -> "ChemicalSpecies":
@@ -93,7 +94,8 @@ class ChemicalSpecies(eqx.Module):
 
         Args:
             formula: Formula
-            state: State of aggregation as defined by JANAF. Defaults to ``cd``.
+            state: State of aggregation as defined by JANAF. Defaults to
+                :const:`~atmodeller.constants.CONDENSED_STATE`
             activity: Activity. Defaults to unity activity.
             solve_for_stability. Solve for stability. Defaults to ``True``.
 
