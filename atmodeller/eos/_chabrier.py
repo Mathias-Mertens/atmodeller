@@ -315,6 +315,29 @@ H2_3000K_chabrier21: RealGasBase = CombinedRealGasFugacity(
 )
 """H2 Chabrier EOS at 3000 K between 1 bar and 1e6 bar :cite:p:`CD21`"""
 
+_H2_4000K_chabrier21: RealGasBase = ChabrierFunction(
+    coeffs=(
+        (
+            0.001804443584257,
+            0.46694548641623,
+            0.49686883364686,
+            -0.048233745656908,
+        )
+    )
+)
+"""Function-fit version at 4000 K for H2 Chabrier EOS between 1 bar and 1e6 bar :cite:p:`CD21`"""
+
+H2_4000K_chabrier21: RealGasBase = CombinedRealGasFugacity(
+    (ideal_gas, _H2_4000K_chabrier21),
+    (
+        ExperimentalCalibration(pressure_max=1),
+        ExperimentalCalibration(
+            temperature_min=4000, temperature_max=4000, pressure_min=1, pressure_max=1e6
+        ),
+    ),
+)
+"""H2 Chabrier EOS at 4000 K between 1 bar and 1e6 bar :cite:p:`CD21`"""
+
 calibration_chabrier21: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=100, temperature_max=1.0e8, pressure_max=1.0e17
 )
@@ -359,6 +382,7 @@ def get_chabrier_eos_models() -> dict[str, RealGasBase]:
     eos_models: dict[str, RealGasBase] = {}
     eos_models["H2_chabrier21"] = H2_chabrier21_bounded
     eos_models["H2_3000K_chabrier21"] = H2_3000K_chabrier21
+    eos_models["H2_4000K_chabrier21"] = H2_4000K_chabrier21
     eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21_bounded
     eos_models["H2_He_Y0292_chabrier21"] = H2_He_Y0292_chabrier21_bounded
     eos_models["H2_He_Y0297_chabrier21"] = H2_He_Y0297_chabrier21_bounded
