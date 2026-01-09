@@ -285,6 +285,10 @@ class ChabrierFunction(RealGasBase):
         _, logP = jnp.broadcast_arrays(jnp.log(temperature), jnp.log(pressure))
         c: Float[Array, " coeffs"] = jnp.array(self.coeffs)
 
+        # The chosen functional form is empirical, but by construction recovers a unity fugacity
+        # coefficient at 1 bar. The c[0]*exp(c[1]*logP) term captures the overall exponential
+        # behavior, while the c[2] + c[3]*logP terms provide additional flexibility to fit the data
+        # more accurately before the exponential term dominates at higher pressures.
         # The terms are calculated and summed term-by-term to ensure broadcasting works correctly.
         log_fugacity_coefficient: Array = logP * (c[0] * jnp.exp(c[1] * logP) + c[2] + c[3] * logP)
 
@@ -292,14 +296,7 @@ class ChabrierFunction(RealGasBase):
 
 
 _H2_3000K_chabrier21: RealGasBase = ChabrierFunction(
-    coeffs=(
-        (
-            0.000791384922536,
-            0.538439447246127,
-            0.102092848927715,
-            -0.015980196398366,
-        )
-    )
+    coeffs=((0.000791384922536, 0.538439447246127, 0.102092848927715, -0.015980196398366))
 )
 """Function-fit version at 3000 K for H2 Chabrier EOS between 1 bar and 1e6 bar :cite:p:`CD21`"""
 
@@ -316,14 +313,7 @@ H2_3000K_chabrier21: RealGasBase = CombinedRealGasFugacity(
 """H2 Chabrier EOS at 3000 K between 1 bar and 1e6 bar :cite:p:`CD21`"""
 
 _H2_4000K_chabrier21: RealGasBase = ChabrierFunction(
-    coeffs=(
-        (
-            0.001804443584257,
-            0.46694548641623,
-            0.49686883364686,
-            -0.048233745656908,
-        )
-    )
+    coeffs=((0.001804443584257, 0.46694548641623, 0.49686883364686, -0.048233745656908))
 )
 """Function-fit version at 4000 K for H2 Chabrier EOS between 1 bar and 1e6 bar :cite:p:`CD21`"""
 
@@ -344,10 +334,7 @@ calibration_chabrier21: ExperimentalCalibration = ExperimentalCalibration(
 """Calibration for :cite:t:`CD21`"""
 H2_chabrier21: RealGas = Chabrier.create(Path("TABLE_H_TP_v1"))
 r""":math:`\mathrm{H}_2` :cite:p:`CD21`"""
-H2_chabrier21_bounded: RealGas = CombinedRealGas.create(
-    [H2_chabrier21],
-    [calibration_chabrier21],
-)
+H2_chabrier21_bounded: RealGas = CombinedRealGas.create([H2_chabrier21], [calibration_chabrier21])
 r""":math:`\mathrm{H}_2` bounded :cite:p:`CD21`"""
 He_chabrier21: RealGas = Chabrier.create(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""
